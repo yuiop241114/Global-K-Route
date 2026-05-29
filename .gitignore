@@ -41,3 +41,6 @@ bin/
 
 # Local proposal/reference files
 /proposal.pdf
+
+# Local helper scripts
+/scripts/start-backend-dev.ps1
