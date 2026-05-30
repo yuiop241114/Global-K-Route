@@ -6,23 +6,22 @@ import org.springframework.stereotype.Service;
 
 import com.contest.kroute.external.tour.TourApiClient;
 import com.contest.kroute.place.dto.NearbyPlaceResponse;
+import com.contest.kroute.place.dto.NearbyPlaceSearchRequest;
+import com.contest.kroute.search.service.SearchLogRecorder;
 
 @Service
 public class PlaceService {
 
 	private final TourApiClient tourApiClient;
+	private final SearchLogRecorder searchLogRecorder;
 
-	public PlaceService(TourApiClient tourApiClient) {
+	public PlaceService(TourApiClient tourApiClient, SearchLogRecorder searchLogRecorder) {
 		this.tourApiClient = tourApiClient;
+		this.searchLogRecorder = searchLogRecorder;
 	}
 
-	public List<NearbyPlaceResponse> findNearbyPlaces(
-			double latitude,
-			double longitude,
-			int radius,
-			String language,
-			String contentType
-	) {
-		return tourApiClient.findNearbyPlaces(latitude, longitude, radius, language, contentType);
+	public List<NearbyPlaceResponse> findNearbyPlaces(NearbyPlaceSearchRequest request) {
+		searchLogRecorder.record(request);
+		return tourApiClient.findNearbyPlaces(request);
 	}
 }
