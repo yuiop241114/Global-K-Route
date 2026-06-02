@@ -135,16 +135,21 @@ const AREAS: Area[] = [
 ];
 
 const CONTENT_TYPES = [
-  { value: "tourist_attraction", label: "Spots" },
-  { value: "restaurant", label: "Food" },
-  { value: "accommodation", label: "Stays" },
+  { value: "tourist_attraction", label: "관광지" },
+  { value: "restaurant", label: "음식점" },
+  { value: "accommodation", label: "숙박" },
 ];
 
 const LANGUAGES = [
-  { value: "en", label: "EN" },
-  { value: "ja", label: "JA" },
-  { value: "zh", label: "ZH" },
-  { value: "ko", label: "KO" },
+  { value: "ko", label: "한국어" },
+  { value: "en", label: "English" },
+  { value: "ja", label: "日本語" },
+  { value: "zh-cn", label: "中文(简体)" },
+  { value: "zh-tw", label: "中文(繁體)" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+  { value: "de", label: "Deutsch" },
+  { value: "ru", label: "Русский" },
 ];
 
 export default function Home() {
@@ -154,7 +159,7 @@ export default function Home() {
     lng: AREAS[0].lng,
   });
   const [radius, setRadius] = useState("1000");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState("ko");
   const [contentType, setContentType] = useState(CONTENT_TYPES[0].value);
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -331,11 +336,11 @@ export default function Home() {
               Global K-Route
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#101828]">
-              Discover Korea by map
+              지도에서 고르는 한국 여행
             </h1>
             <div className="mt-4 flex items-center gap-2 text-xs text-[#667085]">
               <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
-              <span>No live GPS collection</span>
+              <span>현재 위치 자동 수집 없음</span>
               <span className="h-1 w-1 rounded-full bg-[#98a2b3]" />
               <span>{apiBaseUrl}</span>
             </div>
@@ -343,7 +348,7 @@ export default function Home() {
 
           <section className="border-b border-[#e1e7ef] py-4">
             <label className="text-sm font-semibold text-[#344054]">
-              Search base
+              기준 지역
             </label>
             <select
               className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-medium text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
@@ -384,7 +389,7 @@ export default function Home() {
             <div className="mt-4 grid grid-cols-[1fr_108px] gap-3">
               <div>
                 <label className="text-sm font-semibold text-[#344054]">
-                  Radius
+                  반경
                 </label>
                 <div className="mt-2 flex h-12 items-center border border-[#d0d5dd] bg-white px-3 focus-within:border-[#2563eb] focus-within:ring-4 focus-within:ring-[#dbeafe]">
                   <input
@@ -402,7 +407,7 @@ export default function Home() {
 
               <div>
                 <label className="text-sm font-semibold text-[#344054]">
-                  Lang
+                  언어
                 </label>
                 <select
                   className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
@@ -424,16 +429,16 @@ export default function Home() {
               type="button"
               onClick={searchNearbyPlaces}
             >
-              {isLoading ? "Searching..." : "Search this map area"}
+              {isLoading ? "검색 중..." : "이 위치로 검색"}
             </button>
           </section>
 
           <section className="flex min-h-0 flex-1 flex-col py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Nearby results</h2>
+                <h2 className="text-base font-semibold">검색 결과</h2>
                 <p className="mt-1 text-sm text-[#667085]">
-                  {lastQuery ?? "Choose an area and start searching."}
+                  {lastQuery ?? "지도에서 지역을 선택하고 검색하세요."}
                 </p>
               </div>
               <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-[#2563eb]">
@@ -450,7 +455,7 @@ export default function Home() {
             <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
               {places.length === 0 && !errorMessage ? (
                 <div className="flex flex-1 items-center justify-center border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
-                  Results from the backend will appear here after search.
+                  검색 후 관광지 결과가 여기에 표시됩니다.
                 </div>
               ) : null}
 
@@ -553,7 +558,7 @@ export default function Home() {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[#101828]">
-                  {selectedArea.name} selected
+                  {selectedArea.name} 선택됨
                 </p>
                 <p className="truncate text-xs text-[#667085]">
                   {selectedPoint.lat}, {selectedPoint.lng}
@@ -624,19 +629,19 @@ export default function Home() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">
-                    Selected route base
+                    선택한 탐색 기준
                   </p>
                   <h2 className="mt-1 text-2xl font-semibold tracking-tight">
                     {selectedArea.name}
                   </h2>
                 </div>
                 <span className="rounded-full bg-[#f2f4f7] px-3 py-1 text-xs font-semibold text-[#475467]">
-                  area {selectedArea.code}
+                  지역 {selectedArea.code}
                 </span>
               </div>
               <p className="mt-3 text-sm leading-6 text-[#475467]">
-                {selectedArea.description}. Search uses selected map coordinates
-                and public tourism data, not the visitor&apos;s current location.
+                {selectedArea.description}. 현재 위치가 아니라 지도에서 선택한
+                좌표와 공공 관광데이터를 기준으로 검색합니다.
               </p>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <div className="bg-[#f8fafc] px-3 py-2">
@@ -652,7 +657,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="bg-[#f8fafc] px-3 py-2">
-                  <p className="text-xs text-[#667085]">Radius</p>
+                  <p className="text-xs text-[#667085]">반경</p>
                   <p className="mt-1 text-sm font-semibold">{radius}m</p>
                 </div>
               </div>
