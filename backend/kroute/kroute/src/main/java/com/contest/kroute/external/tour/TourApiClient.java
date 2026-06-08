@@ -40,10 +40,16 @@ public class TourApiClient {
 			"ru", "RusService2"
 	);
 
-	private static final Map<String, String> CONTENT_TYPE_IDS = Map.of(
+	private static final Map<String, String> KOREAN_CONTENT_TYPE_IDS = Map.of(
 			"tourist_attraction", "12",
 			"restaurant", "39",
 			"accommodation", "32"
+	);
+
+	private static final Map<String, String> GLOBAL_CONTENT_TYPE_IDS = Map.of(
+			"tourist_attraction", "76",
+			"restaurant", "82",
+			"accommodation", "80"
 	);
 
 	private final RestClient restClient;
@@ -87,7 +93,7 @@ public class TourApiClient {
 				.queryParam("mapY", request.selectedLatitude())
 				.queryParam("radius", request.radius());
 
-		resolveContentTypeId(request.contentType())
+		resolveContentTypeId(request.language(), request.contentType())
 				.ifPresent(contentTypeId -> builder.queryParam("contentTypeId", contentTypeId));
 
 		return builder.build(true).toUri();
@@ -98,11 +104,14 @@ public class TourApiClient {
 		return SERVICE_NAMES_BY_LANGUAGE.getOrDefault(normalizedLanguage, "KorService2");
 	}
 
-	private Optional<String> resolveContentTypeId(String contentType) {
+	private Optional<String> resolveContentTypeId(String language, String contentType) {
 		if (contentType == null || contentType.isBlank()) {
 			return Optional.empty();
 		}
-		return Optional.ofNullable(CONTENT_TYPE_IDS.get(contentType));
+		if ("ko".equalsIgnoreCase(language)) {
+			return Optional.ofNullable(KOREAN_CONTENT_TYPE_IDS.get(contentType));
+		}
+		return Optional.ofNullable(GLOBAL_CONTENT_TYPE_IDS.get(contentType));
 	}
 
 	private List<NearbyPlaceResponse> toNearbyPlaces(JsonNode response) {
@@ -167,6 +176,14 @@ public class TourApiClient {
 			case "32" -> "accommodation";
 			case "38" -> "shopping";
 			case "39" -> "restaurant";
+			case "75" -> "sports";
+			case "76" -> "tourist_attraction";
+			case "77" -> "transportation";
+			case "78" -> "cultural_facility";
+			case "79" -> "shopping";
+			case "80" -> "accommodation";
+			case "82" -> "restaurant";
+			case "85" -> "festival";
 			default -> contentTypeId == null || contentTypeId.isBlank() ? "unknown" : contentTypeId;
 		};
 	}
