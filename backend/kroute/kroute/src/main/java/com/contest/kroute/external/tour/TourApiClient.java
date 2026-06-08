@@ -7,6 +7,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -18,6 +20,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 @Component
 public class TourApiClient {
+
+	private static final Logger log = LoggerFactory.getLogger(TourApiClient.class);
 
 	private static final String LOCATION_BASED_LIST_OPERATION = "locationBasedList2";
 	private static final String MOBILE_OS = "ETC";
@@ -58,11 +62,13 @@ public class TourApiClient {
 			return List.of();
 		}
 
+		URI requestUri = buildLocationBasedListUri(request);
 		JsonNode response = restClient.get()
-				.uri(buildLocationBasedListUri(request))
+				.uri(requestUri)
 				.retrieve()
 				.body(JsonNode.class);
 
+		logTourApiResponse(request, response);
 		return toNearbyPlaces(response);
 	}
 
@@ -113,6 +119,21 @@ public class TourApiClient {
 
 		toNearbyPlace(items).ifPresent(places::add);
 		return places;
+	}
+
+	private void logTourApiResponse(NearbyPlaceSearchRequest request, JsonNode response) {
+		JsonNode header = response.path("response").path("header");
+		JsonNode body = response.path("response").path("body");
+		log.info(
+				"TourAPI location search completed. language={}, service={}, contentType={}, radius={}, resultCode={}, resultMsg={}, totalCount={}",
+				request.language(),
+				resolveServiceName(request.language()),
+				request.contentType(),
+				request.radius(),
+				header.path("resultCode").asText(""),
+				header.path("resultMsg").asText(""),
+				body.path("totalCount").asInt(0)
+		);
 	}
 
 	private Optional<NearbyPlaceResponse> toNearbyPlace(JsonNode item) {
