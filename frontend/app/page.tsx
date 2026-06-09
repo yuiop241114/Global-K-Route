@@ -4,15 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type Area = {
   code: number;
-  name: string;
-  label: string;
-  description: string;
+  text: Record<SupportedUiLanguage, AreaText>;
   lat: number;
   lng: number;
   mapX: string;
   mapY: string;
   accent: string;
 };
+
+type AreaText = {
+  name: string;
+  label: string;
+  description: string;
+};
+
+type SupportedUiLanguage = "ko" | "en";
 
 type Place = {
   contentId: string;
@@ -79,9 +85,18 @@ declare global {
 const AREAS: Area[] = [
   {
     code: 1,
-    name: "Seoul",
-    label: "Urban",
-    description: "Palaces, design districts, food alleys",
+    text: {
+      ko: {
+        name: "서울",
+        label: "도심",
+        description: "궁궐, 디자인 거리, 먹거리 골목",
+      },
+      en: {
+        name: "Seoul",
+        label: "Urban",
+        description: "Palaces, design districts, food alleys",
+      },
+    },
     lat: 37.5665,
     lng: 126.978,
     mapX: "48%",
@@ -90,9 +105,18 @@ const AREAS: Area[] = [
   },
   {
     code: 6,
-    name: "Busan",
-    label: "Coast",
-    description: "Ocean routes, markets, night views",
+    text: {
+      ko: {
+        name: "부산",
+        label: "해안",
+        description: "바다 코스, 시장, 야경",
+      },
+      en: {
+        name: "Busan",
+        label: "Coast",
+        description: "Ocean routes, markets, night views",
+      },
+    },
     lat: 35.1796,
     lng: 129.0756,
     mapX: "68%",
@@ -101,9 +125,18 @@ const AREAS: Area[] = [
   },
   {
     code: 39,
-    name: "Jeju",
-    label: "Island",
-    description: "Nature trails, cafes, scenic drives",
+    text: {
+      ko: {
+        name: "제주",
+        label: "섬",
+        description: "자연 산책로, 카페, 드라이브 코스",
+      },
+      en: {
+        name: "Jeju",
+        label: "Island",
+        description: "Nature trails, cafes, scenic drives",
+      },
+    },
     lat: 33.4996,
     lng: 126.5312,
     mapX: "42%",
@@ -112,9 +145,18 @@ const AREAS: Area[] = [
   },
   {
     code: 31,
-    name: "Gyeonggi",
-    label: "Day trip",
-    description: "Historic stops, theme attractions",
+    text: {
+      ko: {
+        name: "경기",
+        label: "근교",
+        description: "역사 명소, 테마 관광지",
+      },
+      en: {
+        name: "Gyeonggi",
+        label: "Day trip",
+        description: "Historic stops, theme attractions",
+      },
+    },
     lat: 37.4138,
     lng: 127.5183,
     mapX: "53%",
@@ -123,9 +165,18 @@ const AREAS: Area[] = [
   },
   {
     code: 32,
-    name: "Gangwon",
-    label: "Nature",
-    description: "Mountains, beaches, wellness stays",
+    text: {
+      ko: {
+        name: "강원",
+        label: "자연",
+        description: "산, 바다, 웰니스 숙소",
+      },
+      en: {
+        name: "Gangwon",
+        label: "Nature",
+        description: "Mountains, beaches, wellness stays",
+      },
+    },
     lat: 37.8228,
     lng: 128.1555,
     mapX: "64%",
@@ -135,9 +186,9 @@ const AREAS: Area[] = [
 ];
 
 const CONTENT_TYPES = [
-  { value: "tourist_attraction", label: "관광지" },
-  { value: "restaurant", label: "음식점" },
-  { value: "accommodation", label: "숙박" },
+  { value: "tourist_attraction", labels: { ko: "관광지", en: "Spots" } },
+  { value: "restaurant", labels: { ko: "음식점", en: "Food" } },
+  { value: "accommodation", labels: { ko: "숙박", en: "Stays" } },
 ];
 
 const LANGUAGES = [
@@ -151,6 +202,57 @@ const LANGUAGES = [
   { value: "de", label: "Deutsch" },
   { value: "ru", label: "Русский" },
 ];
+
+const UI_MESSAGES = {
+  ko: {
+    heroTitle: "지도에서 고르는 한국 여행",
+    privacyNotice: "현재 위치 자동 수집 없음",
+    searchBase: "기준 지역",
+    radius: "반경",
+    language: "언어",
+    searchButton: "이 위치로 검색",
+    searching: "검색 중...",
+    resultsTitle: "검색 결과",
+    emptyHint: "지도에서 지역을 선택하고 검색하세요.",
+    emptyResults: "검색 후 관광지 결과가 여기에 표시됩니다.",
+    fallbackCategory: "관광지",
+    mapLabel: "지도",
+    mapMissingKeyTitle: "Kakao Maps 키가 필요합니다",
+    mapLoadErrorTitle: "Kakao Maps를 불러오지 못했습니다",
+    mapLoadingTitle: "Kakao Maps를 불러오는 중입니다",
+    mapSetupGuide:
+      "프론트 환경변수에 NEXT_PUBLIC_KAKAO_MAP_APP_KEY를 설정한 뒤 Next 개발 서버를 다시 시작하세요.",
+    selectedSuffix: "선택됨",
+    selectedRouteBase: "선택한 탐색 기준",
+    areaCode: "지역",
+    selectedBaseDescription:
+      "현재 위치가 아니라 지도에서 선택한 좌표와 공공 관광데이터를 기준으로 검색합니다.",
+  },
+  en: {
+    heroTitle: "Discover Korea by map",
+    privacyNotice: "No live GPS collection",
+    searchBase: "Search base",
+    radius: "Radius",
+    language: "Lang",
+    searchButton: "Search this map area",
+    searching: "Searching...",
+    resultsTitle: "Nearby results",
+    emptyHint: "Select an area on the map, then search.",
+    emptyResults: "Nearby tourism results will appear here after search.",
+    fallbackCategory: "Spots",
+    mapLabel: "MAP",
+    mapMissingKeyTitle: "Kakao Maps key is required",
+    mapLoadErrorTitle: "Kakao Maps could not be loaded",
+    mapLoadingTitle: "Loading Kakao Maps",
+    mapSetupGuide:
+      "Set NEXT_PUBLIC_KAKAO_MAP_APP_KEY in the frontend environment, then restart the Next dev server.",
+    selectedSuffix: "selected",
+    selectedRouteBase: "Selected route base",
+    areaCode: "area",
+    selectedBaseDescription:
+      "Search uses selected map coordinates and public tourism data, not the visitor's current location.",
+  },
+} satisfies Record<SupportedUiLanguage, Record<string, string>>;
 
 export default function Home() {
   const [selectedArea, setSelectedArea] = useState<Area>(AREAS[0]);
@@ -180,6 +282,9 @@ export default function Home() {
   }, []);
 
   const kakaoMapAppKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY;
+  const uiLanguage: SupportedUiLanguage = language === "ko" ? "ko" : "en";
+  const messages = UI_MESSAGES[uiLanguage];
+  const selectedAreaText = selectedArea.text[uiLanguage];
 
   const selectedContentType = useMemo(() => {
     return CONTENT_TYPES.find((type) => type.value === contentType);
@@ -219,7 +324,9 @@ export default function Home() {
       const result = (await response.json()) as ApiResponse<Place[]>;
       setPlaces(result.data);
       setLastQuery(
-        `${selectedArea.name} / ${selectedContentType?.label ?? "Spots"} / ${radius}m`,
+        `${selectedAreaText.name} / ${
+          selectedContentType?.labels[uiLanguage] ?? messages.fallbackCategory
+        } / ${radius}m`,
       );
     } catch (error) {
       setPlaces([]);
@@ -336,11 +443,11 @@ export default function Home() {
               Global K-Route
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#101828]">
-              지도에서 고르는 한국 여행
+              {messages.heroTitle}
             </h1>
             <div className="mt-4 flex items-center gap-2 text-xs text-[#667085]">
               <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
-              <span>현재 위치 자동 수집 없음</span>
+              <span>{messages.privacyNotice}</span>
               <span className="h-1 w-1 rounded-full bg-[#98a2b3]" />
               <span>{apiBaseUrl}</span>
             </div>
@@ -348,7 +455,7 @@ export default function Home() {
 
           <section className="border-b border-[#e1e7ef] py-4">
             <label className="text-sm font-semibold text-[#344054]">
-              기준 지역
+              {messages.searchBase}
             </label>
             <select
               className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-medium text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
@@ -364,7 +471,7 @@ export default function Home() {
             >
               {AREAS.map((area) => (
                 <option key={area.code} value={area.code}>
-                  {area.name}
+                  {area.text[uiLanguage].name}
                 </option>
               ))}
             </select>
@@ -381,7 +488,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setContentType(type.value)}
                 >
-                  {type.label}
+                  {type.labels[uiLanguage]}
                 </button>
               ))}
             </div>
@@ -389,7 +496,7 @@ export default function Home() {
             <div className="mt-4 grid grid-cols-[1fr_108px] gap-3">
               <div>
                 <label className="text-sm font-semibold text-[#344054]">
-                  반경
+                  {messages.radius}
                 </label>
                 <div className="mt-2 flex h-12 items-center border border-[#d0d5dd] bg-white px-3 focus-within:border-[#2563eb] focus-within:ring-4 focus-within:ring-[#dbeafe]">
                   <input
@@ -407,7 +514,7 @@ export default function Home() {
 
               <div>
                 <label className="text-sm font-semibold text-[#344054]">
-                  언어
+                  {messages.language}
                 </label>
                 <select
                   className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
@@ -429,16 +536,16 @@ export default function Home() {
               type="button"
               onClick={searchNearbyPlaces}
             >
-              {isLoading ? "검색 중..." : "이 위치로 검색"}
+              {isLoading ? messages.searching : messages.searchButton}
             </button>
           </section>
 
           <section className="flex min-h-0 flex-1 flex-col py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">검색 결과</h2>
+                <h2 className="text-base font-semibold">{messages.resultsTitle}</h2>
                 <p className="mt-1 text-sm text-[#667085]">
-                  {lastQuery ?? "지도에서 지역을 선택하고 검색하세요."}
+                  {lastQuery ?? messages.emptyHint}
                 </p>
               </div>
               <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-[#2563eb]">
@@ -455,7 +562,7 @@ export default function Home() {
             <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
               {places.length === 0 && !errorMessage ? (
                 <div className="flex flex-1 items-center justify-center border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
-                  검색 후 관광지 결과가 여기에 표시됩니다.
+                  {messages.emptyResults}
                 </div>
               ) : null}
 
@@ -466,7 +573,7 @@ export default function Home() {
                 >
                   <div className="flex gap-3">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center bg-[#edf3f8] text-xs font-semibold text-[#475467]">
-                      MAP
+                      {messages.mapLabel}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -537,14 +644,13 @@ export default function Home() {
               <div className="max-w-md border border-white/80 bg-white/92 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.16)]">
                 <p className="text-sm font-semibold text-[#101828]">
                   {mapStatus === "missing-key"
-                    ? "Kakao Maps key is required"
+                    ? messages.mapMissingKeyTitle
                     : mapStatus === "error"
-                      ? "Kakao Maps could not be loaded"
-                      : "Loading Kakao Maps"}
+                      ? messages.mapLoadErrorTitle
+                      : messages.mapLoadingTitle}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[#667085]">
-                  Set NEXT_PUBLIC_KAKAO_MAP_APP_KEY in the frontend environment,
-                  then restart the Next dev server.
+                  {messages.mapSetupGuide}
                 </p>
               </div>
             </div>
@@ -558,7 +664,7 @@ export default function Home() {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[#101828]">
-                  {selectedArea.name} 선택됨
+                  {selectedAreaText.name} {messages.selectedSuffix}
                 </p>
                 <p className="truncate text-xs text-[#667085]">
                   {selectedPoint.lat}, {selectedPoint.lng}
@@ -578,7 +684,7 @@ export default function Home() {
                   type="button"
                   onClick={() => selectArea(area)}
                 >
-                  {area.name}
+                  {area.text[uiLanguage].name}
                 </button>
               ))}
             </div>
@@ -611,13 +717,13 @@ export default function Home() {
                   }`}
                 >
                   <span className="block text-sm font-semibold text-[#101828]">
-                    {area.name}
+                    {area.text[uiLanguage].name}
                   </span>
                   <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
-                    {area.label}
+                    {area.text[uiLanguage].label}
                   </span>
                   <span className="mt-2 block text-sm leading-5 text-[#667085]">
-                    {area.description}
+                    {area.text[uiLanguage].description}
                   </span>
                 </span>
               </button>
@@ -629,19 +735,18 @@ export default function Home() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">
-                    선택한 탐색 기준
+                    {messages.selectedRouteBase}
                   </p>
                   <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                    {selectedArea.name}
+                    {selectedAreaText.name}
                   </h2>
                 </div>
                 <span className="rounded-full bg-[#f2f4f7] px-3 py-1 text-xs font-semibold text-[#475467]">
-                  지역 {selectedArea.code}
+                  {messages.areaCode} {selectedArea.code}
                 </span>
               </div>
               <p className="mt-3 text-sm leading-6 text-[#475467]">
-                {selectedArea.description}. 현재 위치가 아니라 지도에서 선택한
-                좌표와 공공 관광데이터를 기준으로 검색합니다.
+                {selectedAreaText.description}. {messages.selectedBaseDescription}
               </p>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <div className="bg-[#f8fafc] px-3 py-2">
@@ -657,7 +762,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="bg-[#f8fafc] px-3 py-2">
-                  <p className="text-xs text-[#667085]">반경</p>
+                  <p className="text-xs text-[#667085]">{messages.radius}</p>
                   <p className="mt-1 text-sm font-semibold">{radius}m</p>
                 </div>
               </div>
