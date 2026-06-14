@@ -191,6 +191,19 @@ const CONTENT_TYPES = [
   { value: "accommodation", labels: { ko: "숙박", en: "Stays" } },
 ];
 
+const CATEGORY_LABELS: Record<string, Record<SupportedUiLanguage, string>> = {
+  tourist_attraction: { ko: "관광지", en: "Spot" },
+  restaurant: { ko: "음식점", en: "Food" },
+  accommodation: { ko: "숙박", en: "Stay" },
+  cultural_facility: { ko: "문화시설", en: "Culture" },
+  festival: { ko: "축제", en: "Festival" },
+  travel_course: { ko: "여행코스", en: "Course" },
+  shopping: { ko: "쇼핑", en: "Shopping" },
+  sports: { ko: "레포츠", en: "Sports" },
+  transportation: { ko: "교통", en: "Transit" },
+  unknown: { ko: "기타", en: "Other" },
+};
+
 const LANGUAGES = [
   { value: "ko", label: "한국어" },
   { value: "en", label: "English" },
@@ -216,7 +229,7 @@ const UI_MESSAGES = {
     emptyHint: "지도에서 지역을 선택하고 검색하세요.",
     emptyResults: "검색 후 관광지 결과가 여기에 표시됩니다.",
     fallbackCategory: "관광지",
-    mapLabel: "지도",
+    imageFallback: "이미지 없음",
     mapMissingKeyTitle: "Kakao Maps 키가 필요합니다",
     mapLoadErrorTitle: "Kakao Maps를 불러오지 못했습니다",
     mapLoadingTitle: "Kakao Maps를 불러오는 중입니다",
@@ -240,7 +253,7 @@ const UI_MESSAGES = {
     emptyHint: "Select an area on the map, then search.",
     emptyResults: "Nearby tourism results will appear here after search.",
     fallbackCategory: "Spots",
-    mapLabel: "MAP",
+    imageFallback: "No image",
     mapMissingKeyTitle: "Kakao Maps key is required",
     mapLoadErrorTitle: "Kakao Maps could not be loaded",
     mapLoadingTitle: "Loading Kakao Maps",
@@ -266,6 +279,9 @@ export default function Home() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [mapStatus, setMapStatus] = useState<
     "missing-key" | "loading" | "ready" | "error"
   >(() =>
@@ -295,9 +311,17 @@ export default function Home() {
     setSelectedPoint({ lat: area.lat, lng: area.lng });
   }
 
+  function getCategoryLabel(category: string) {
+    return (
+      CATEGORY_LABELS[category]?.[uiLanguage] ??
+      (category ? category : CATEGORY_LABELS.unknown[uiLanguage])
+    );
+  }
+
   async function searchNearbyPlaces() {
     setIsLoading(true);
     setErrorMessage(null);
+    setFailedImageIds(new Set());
 
     const params = new URLSearchParams({
       selectedLat: selectedPoint.lat.toString(),
@@ -572,9 +596,31 @@ export default function Home() {
                   key={place.contentId}
                 >
                   <div className="flex gap-3">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center bg-[#edf3f8] text-xs font-semibold text-[#475467]">
-                      {messages.mapLabel}
-                    </div>
+                    {place.imageUrl && !failedImageIds.has(place.contentId) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={place.title}
+                        className="h-20 w-20 shrink-0 object-cover"
+                        loading="lazy"
+                        src={place.imageUrl}
+                        onError={() => {
+                          setFailedImageIds((previous) => {
+                            const next = new Set(previous);
+                            next.add(place.contentId);
+                            return next;
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center bg-[#edf3f8] px-2 text-center">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#2563eb]">
+                          {getCategoryLabel(place.category)}
+                        </span>
+                        <span className="mt-1 text-[11px] leading-4 text-[#667085]">
+                          {messages.imageFallback}
+                        </span>
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="truncate text-sm font-semibold text-[#101828]">
@@ -588,7 +634,7 @@ export default function Home() {
                         {place.address}
                       </p>
                       <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
-                        {place.category}
+                        {getCategoryLabel(place.category)}
                       </p>
                     </div>
                   </div>

@@ -162,8 +162,29 @@ public class TourApiClient {
 				parseDouble(item.path("dist").asText(null))
 						.map(Double::intValue)
 						.orElse(0),
-				item.path("firstimage").asText(null)
+				resolveImageUrl(item)
 		));
+	}
+
+	private String resolveImageUrl(JsonNode item) {
+		String imageUrl = firstPresentText(item, "firstimage", "firstimage2").orElse(null);
+		if (imageUrl == null) {
+			return null;
+		}
+		if (imageUrl.startsWith("http://")) {
+			return "https://" + imageUrl.substring("http://".length());
+		}
+		return imageUrl;
+	}
+
+	private Optional<String> firstPresentText(JsonNode item, String... fieldNames) {
+		for (String fieldName : fieldNames) {
+			String value = item.path(fieldName).asText(null);
+			if (value != null && !value.isBlank()) {
+				return Optional.of(value);
+			}
+		}
+		return Optional.empty();
 	}
 
 	private String resolveCategory(String contentTypeId) {
