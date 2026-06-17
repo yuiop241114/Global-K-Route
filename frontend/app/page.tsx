@@ -50,11 +50,18 @@ type KakaoLatLng = {
 
 type KakaoMap = {
   setCenter: (latLng: KakaoLatLng) => void;
+  setLevel: (level: number) => void;
 };
 
 type KakaoMarker = {
   setMap: (map: KakaoMap | null) => void;
   setPosition: (latLng: KakaoLatLng) => void;
+};
+
+type KakaoGeocoderResult = {
+  address_name: string;
+  x: string;
+  y: string;
 };
 
 type KakaoMapsApi = {
@@ -65,6 +72,17 @@ type KakaoMapsApi = {
     options: { center: KakaoLatLng; level: number },
   ) => KakaoMap;
   Marker: new (options: { map?: KakaoMap; position: KakaoLatLng }) => KakaoMarker;
+  services: {
+    Status: {
+      OK: string;
+    };
+    Geocoder: new () => {
+      addressSearch: (
+        query: string,
+        callback: (result: KakaoGeocoderResult[], status: string) => void,
+      ) => void;
+    };
+  };
   event: {
     addListener: (
       target: KakaoMap,
@@ -221,6 +239,13 @@ const UI_MESSAGES = {
     heroTitle: "지도에서 고르는 한국 여행",
     privacyNotice: "현재 위치 자동 수집 없음",
     searchBase: "기준 지역",
+    addressSearch: "상세 주소 검색",
+    addressPlaceholder: "예: 서울특별시 강동구 천중로",
+    addressSearchButton: "주소 이동",
+    addressSearching: "이동 중...",
+    addressMapNotReady: "지도가 준비된 뒤 주소를 검색할 수 있습니다.",
+    addressNoResults: "해당 주소를 찾지 못했습니다. 도로명이나 지번을 조금 더 자세히 입력해 주세요.",
+    addressSearchFailed: "주소 검색 중 문제가 발생했습니다.",
     radius: "반경",
     language: "언어",
     searchButton: "이 위치로 검색",
@@ -245,6 +270,13 @@ const UI_MESSAGES = {
     heroTitle: "Discover Korea by map",
     privacyNotice: "No live GPS collection",
     searchBase: "Search base",
+    addressSearch: "Detailed address",
+    addressPlaceholder: "e.g. Cheonjung-ro, Gangdong-gu, Seoul",
+    addressSearchButton: "Move",
+    addressSearching: "Moving...",
+    addressMapNotReady: "Search by address after the map is ready.",
+    addressNoResults: "No address result found. Try a more specific road or lot address.",
+    addressSearchFailed: "Address search failed.",
     radius: "Radius",
     language: "Lang",
     searchButton: "Search this map area",
@@ -275,9 +307,11 @@ export default function Home() {
   });
   const [radius, setRadius] = useState("1000");
   const [language, setLanguage] = useState("ko");
+  const [addressQuery, setAddressQuery] = useState("");
   const [contentType, setContentType] = useState(CONTENT_TYPES[0].value);
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddressSearching, setIsAddressSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(
     () => new Set(),
@@ -286,6 +320,9 @@ export default function Home() {
     "missing-key" | "loading" | "ready" | "error"
   >(() =>
     process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY ? "loading" : "missing-key",
+  );
+  const [selectedLocationName, setSelectedLocationName] = useState<string | null>(
+    null,
   );
   const [lastQuery, setLastQuery] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -309,6 +346,7 @@ export default function Home() {
   function selectArea(area: Area) {
     setSelectedArea(area);
     setSelectedPoint({ lat: area.lat, lng: area.lng });
+    setSelectedLocationName(null);
   }
 
   function getCategoryLabel(category: string) {
@@ -316,6 +354,48 @@ export default function Home() {
       CATEGORY_LABELS[category]?.[uiLanguage] ??
       (category ? category : CATEGORY_LABELS.unknown[uiLanguage])
     );
+  }
+
+  function searchAddress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const query = addressQuery.trim();
+    if (!query) {
+      return;
+    }
+
+    if (!window.kakao?.maps?.services || !mapRef.current) {
+      setErrorMessage(messages.addressMapNotReady);
+      return;
+    }
+
+    setIsAddressSearching(true);
+    setErrorMessage(null);
+
+    const geocoder = new window.kakao.maps.services.Geocoder();
+    geocoder.addressSearch(query, (result, status) => {
+      setIsAddressSearching(false);
+
+      if (
+        status !== window.kakao?.maps.services.Status.OK ||
+        result.length === 0
+      ) {
+        setErrorMessage(messages.addressNoResults);
+        return;
+      }
+
+      const matchedAddress = result[0];
+      const nextPoint = {
+        lat: Number(Number(matchedAddress.y).toFixed(6)),
+        lng: Number(Number(matchedAddress.x).toFixed(6)),
+      };
+
+      setSelectedPoint(nextPoint);
+      setSelectedLocationName(matchedAddress.address_name || query);
+      setPlaces([]);
+      setLastQuery(null);
+      mapRef.current?.setLevel(5);
+    });
   }
 
   async function searchNearbyPlaces() {
@@ -348,7 +428,7 @@ export default function Home() {
       const result = (await response.json()) as ApiResponse<Place[]>;
       setPlaces(result.data);
       setLastQuery(
-        `${selectedAreaText.name} / ${
+        `${selectedLocationName ?? selectedAreaText.name} / ${
           selectedContentType?.labels[uiLanguage] ?? messages.fallbackCategory
         } / ${radius}m`,
       );
@@ -395,6 +475,7 @@ export default function Home() {
           lat: Number(event.latLng.getLat().toFixed(6)),
           lng: Number(event.latLng.getLng().toFixed(6)),
         });
+        setSelectedLocationName(null);
       });
 
       mapRef.current = map;
@@ -420,7 +501,7 @@ export default function Home() {
 
     const script = document.createElement("script");
     script.dataset.kakaoMapSdk = "true";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapAppKey}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapAppKey}&autoload=false&libraries=services`;
     script.async = true;
     script.onload = () => {
       window.kakao?.maps.load(initializeMap);
@@ -499,6 +580,30 @@ export default function Home() {
                 </option>
               ))}
             </select>
+
+            <form className="mt-3" onSubmit={searchAddress}>
+              <label className="text-sm font-semibold text-[#344054]">
+                {messages.addressSearch}
+              </label>
+              <div className="mt-2 grid grid-cols-[1fr_86px] gap-2">
+                <input
+                  className="h-11 min-w-0 border border-[#d0d5dd] bg-white px-3 text-sm font-medium text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
+                  placeholder={messages.addressPlaceholder}
+                  type="search"
+                  value={addressQuery}
+                  onChange={(event) => setAddressQuery(event.target.value)}
+                />
+                <button
+                  className="h-11 border border-[#2563eb] bg-white px-3 text-sm font-semibold text-[#2563eb] transition hover:bg-[#eff6ff] disabled:border-[#bfdbfe] disabled:text-[#93c5fd]"
+                  disabled={isAddressSearching || mapStatus !== "ready"}
+                  type="submit"
+                >
+                  {isAddressSearching
+                    ? messages.addressSearching
+                    : messages.addressSearchButton}
+                </button>
+              </div>
+            </form>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               {CONTENT_TYPES.map((type) => (
@@ -710,7 +815,8 @@ export default function Home() {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[#101828]">
-                  {selectedAreaText.name} {messages.selectedSuffix}
+                  {selectedLocationName ??
+                    `${selectedAreaText.name} ${messages.selectedSuffix}`}
                 </p>
                 <p className="truncate text-xs text-[#667085]">
                   {selectedPoint.lat}, {selectedPoint.lng}
@@ -784,7 +890,7 @@ export default function Home() {
                     {messages.selectedRouteBase}
                   </p>
                   <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                    {selectedAreaText.name}
+                    {selectedLocationName ?? selectedAreaText.name}
                   </h2>
                 </div>
                 <span className="rounded-full bg-[#f2f4f7] px-3 py-1 text-xs font-semibold text-[#475467]">
