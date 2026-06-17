@@ -12,6 +12,13 @@ type Area = {
   accent: string;
 };
 
+type AreaPreset = {
+  areaCode: number;
+  text: Record<SupportedUiLanguage, AreaText>;
+  lat: number;
+  lng: number;
+};
+
 type AreaText = {
   name: string;
   label: string;
@@ -203,6 +210,400 @@ const AREAS: Area[] = [
   },
 ];
 
+const AREA_PRESETS: AreaPreset[] = [
+  {
+    areaCode: 1,
+    text: {
+      ko: {
+        name: "궁궐·종로",
+        label: "역사",
+        description: "경복궁, 북촌, 인사동 주변",
+      },
+      en: {
+        name: "Palaces·Jongno",
+        label: "Heritage",
+        description: "Gyeongbokgung, Bukchon, Insadong",
+      },
+    },
+    lat: 37.5796,
+    lng: 126.977,
+  },
+  {
+    areaCode: 1,
+    text: {
+      ko: {
+        name: "홍대·연남",
+        label: "문화",
+        description: "거리 공연, 카페, 편집숍",
+      },
+      en: {
+        name: "Hongdae·Yeonnam",
+        label: "Culture",
+        description: "Street music, cafes, indie shops",
+      },
+    },
+    lat: 37.5563,
+    lng: 126.9238,
+  },
+  {
+    areaCode: 1,
+    text: {
+      ko: {
+        name: "강남·코엑스",
+        label: "도심",
+        description: "쇼핑, 전시, 도심 음식점",
+      },
+      en: {
+        name: "Gangnam·COEX",
+        label: "City",
+        description: "Shopping, exhibitions, city dining",
+      },
+    },
+    lat: 37.5126,
+    lng: 127.0588,
+  },
+  {
+    areaCode: 1,
+    text: {
+      ko: {
+        name: "잠실·석촌호수",
+        label: "호수",
+        description: "호수 산책, 전망, 테마 명소",
+      },
+      en: {
+        name: "Jamsil·Seokchon",
+        label: "Lake",
+        description: "Lake walks, views, theme spots",
+      },
+    },
+    lat: 37.5112,
+    lng: 127.0982,
+  },
+  {
+    areaCode: 1,
+    text: {
+      ko: {
+        name: "강동·한강 동부",
+        label: "로컬",
+        description: "한강 동부, 강동 생활권",
+      },
+      en: {
+        name: "Gangdong·East Han",
+        label: "Local",
+        description: "East Han River and Gangdong area",
+      },
+    },
+    lat: 37.5505,
+    lng: 127.1238,
+  },
+  {
+    areaCode: 6,
+    text: {
+      ko: {
+        name: "해운대·달맞이",
+        label: "바다",
+        description: "해변, 달맞이길, 오션뷰",
+      },
+      en: {
+        name: "Haeundae·Dalmaji",
+        label: "Beach",
+        description: "Beach, Dalmaji road, ocean views",
+      },
+    },
+    lat: 35.1587,
+    lng: 129.1604,
+  },
+  {
+    areaCode: 6,
+    text: {
+      ko: {
+        name: "광안리·수영",
+        label: "야경",
+        description: "광안대교, 해변 카페, 야경",
+      },
+      en: {
+        name: "Gwangalli·Suyeong",
+        label: "Night view",
+        description: "Bridge views, beach cafes, nightlife",
+      },
+    },
+    lat: 35.1532,
+    lng: 129.1186,
+  },
+  {
+    areaCode: 6,
+    text: {
+      ko: {
+        name: "남포·자갈치",
+        label: "시장",
+        description: "시장, 먹거리, 원도심 산책",
+      },
+      en: {
+        name: "Nampo·Jagalchi",
+        label: "Market",
+        description: "Markets, seafood, old downtown walks",
+      },
+    },
+    lat: 35.0969,
+    lng: 129.0305,
+  },
+  {
+    areaCode: 6,
+    text: {
+      ko: {
+        name: "서면",
+        label: "중심",
+        description: "쇼핑, 음식점, 도심 이동 거점",
+      },
+      en: {
+        name: "Seomyeon",
+        label: "Center",
+        description: "Shopping, restaurants, transit hub",
+      },
+    },
+    lat: 35.1577,
+    lng: 129.0592,
+  },
+  {
+    areaCode: 6,
+    text: {
+      ko: {
+        name: "영도",
+        label: "섬",
+        description: "해안 산책, 전망, 로컬 카페",
+      },
+      en: {
+        name: "Yeongdo",
+        label: "Island",
+        description: "Coastal walks, viewpoints, local cafes",
+      },
+    },
+    lat: 35.0781,
+    lng: 129.0645,
+  },
+  {
+    areaCode: 39,
+    text: {
+      ko: {
+        name: "제주시·공항",
+        label: "도착",
+        description: "공항 주변, 도심 맛집, 용두암",
+      },
+      en: {
+        name: "Jeju City·Airport",
+        label: "Arrival",
+        description: "Airport area, city food, Yongduam",
+      },
+    },
+    lat: 33.5066,
+    lng: 126.493,
+  },
+  {
+    areaCode: 39,
+    text: {
+      ko: {
+        name: "애월",
+        label: "해안",
+        description: "해안도로, 카페, 노을",
+      },
+      en: {
+        name: "Aewol",
+        label: "Coast",
+        description: "Coastal roads, cafes, sunset views",
+      },
+    },
+    lat: 33.4628,
+    lng: 126.3091,
+  },
+  {
+    areaCode: 39,
+    text: {
+      ko: {
+        name: "성산·우도",
+        label: "일출",
+        description: "성산일출봉, 우도, 동부 해안",
+      },
+      en: {
+        name: "Seongsan·Udo",
+        label: "Sunrise",
+        description: "Seongsan Ilchulbong, Udo, east coast",
+      },
+    },
+    lat: 33.4589,
+    lng: 126.9421,
+  },
+  {
+    areaCode: 39,
+    text: {
+      ko: {
+        name: "서귀포·중문",
+        label: "휴양",
+        description: "폭포, 리조트, 중문 관광단지",
+      },
+      en: {
+        name: "Seogwipo·Jungmun",
+        label: "Resort",
+        description: "Waterfalls, resorts, Jungmun complex",
+      },
+    },
+    lat: 33.2539,
+    lng: 126.4149,
+  },
+  {
+    areaCode: 39,
+    text: {
+      ko: {
+        name: "한림·협재",
+        label: "해변",
+        description: "협재해변, 비양도, 서부 카페",
+      },
+      en: {
+        name: "Hallim·Hyeopjae",
+        label: "Beach",
+        description: "Hyeopjae beach, Biyangdo, west cafes",
+      },
+    },
+    lat: 33.3936,
+    lng: 126.2398,
+  },
+  {
+    areaCode: 31,
+    text: {
+      ko: {
+        name: "수원 화성",
+        label: "역사",
+        description: "화성행궁, 성곽길, 행리단길",
+      },
+      en: {
+        name: "Suwon Hwaseong",
+        label: "Heritage",
+        description: "Fortress, palace, Haengnidan-gil",
+      },
+    },
+    lat: 37.2852,
+    lng: 127.0142,
+  },
+  {
+    areaCode: 31,
+    text: {
+      ko: {
+        name: "가평·청평",
+        label: "자연",
+        description: "호수, 수목원, 근교 여행",
+      },
+      en: {
+        name: "Gapyeong·Cheongpyeong",
+        label: "Nature",
+        description: "Lakes, gardens, day trips",
+      },
+    },
+    lat: 37.7353,
+    lng: 127.4265,
+  },
+  {
+    areaCode: 31,
+    text: {
+      ko: {
+        name: "파주·헤이리",
+        label: "예술",
+        description: "출판단지, 헤이리, 임진각",
+      },
+      en: {
+        name: "Paju·Heyri",
+        label: "Art",
+        description: "Book city, Heyri, Imjingak",
+      },
+    },
+    lat: 37.7894,
+    lng: 126.6976,
+  },
+  {
+    areaCode: 31,
+    text: {
+      ko: {
+        name: "용인·에버랜드",
+        label: "테마",
+        description: "테마파크, 가족 여행, 리조트",
+      },
+      en: {
+        name: "Yongin·Everland",
+        label: "Theme",
+        description: "Theme park, family trip, resorts",
+      },
+    },
+    lat: 37.2936,
+    lng: 127.2022,
+  },
+  {
+    areaCode: 32,
+    text: {
+      ko: {
+        name: "춘천·남이섬",
+        label: "호수",
+        description: "호수, 섬 여행, 닭갈비",
+      },
+      en: {
+        name: "Chuncheon·Nami",
+        label: "Lake",
+        description: "Lakes, island trips, local food",
+      },
+    },
+    lat: 37.7919,
+    lng: 127.525,
+  },
+  {
+    areaCode: 32,
+    text: {
+      ko: {
+        name: "강릉·경포",
+        label: "바다",
+        description: "경포해변, 커피거리, 호수",
+      },
+      en: {
+        name: "Gangneung·Gyeongpo",
+        label: "Sea",
+        description: "Beach, coffee street, lake",
+      },
+    },
+    lat: 37.8056,
+    lng: 128.9088,
+  },
+  {
+    areaCode: 32,
+    text: {
+      ko: {
+        name: "속초·설악",
+        label: "산",
+        description: "설악산, 속초해변, 중앙시장",
+      },
+      en: {
+        name: "Sokcho·Seorak",
+        label: "Mountain",
+        description: "Seoraksan, beaches, central market",
+      },
+    },
+    lat: 38.2043,
+    lng: 128.5918,
+  },
+  {
+    areaCode: 32,
+    text: {
+      ko: {
+        name: "평창·대관령",
+        label: "고원",
+        description: "목장, 고원 풍경, 겨울 여행",
+      },
+      en: {
+        name: "Pyeongchang·Daegwallyeong",
+        label: "Highland",
+        description: "Ranches, highlands, winter trips",
+      },
+    },
+    lat: 37.6771,
+    lng: 128.7063,
+  },
+];
+
 const CONTENT_TYPES = [
   { value: "tourist_attraction", labels: { ko: "관광지", en: "Spots" } },
   { value: "restaurant", labels: { ko: "음식점", en: "Food" } },
@@ -239,6 +640,7 @@ const UI_MESSAGES = {
     heroTitle: "지도에서 고르는 한국 여행",
     privacyNotice: "현재 위치 자동 수집 없음",
     searchBase: "기준 지역",
+    recommendedAreas: "추천 관광권역",
     addressSearch: "상세 주소 검색",
     addressPlaceholder: "예: 서울특별시 강동구 천중로",
     addressSearchButton: "주소 이동",
@@ -270,6 +672,7 @@ const UI_MESSAGES = {
     heroTitle: "Discover Korea by map",
     privacyNotice: "No live GPS collection",
     searchBase: "Search base",
+    recommendedAreas: "Recommended zones",
     addressSearch: "Detailed address",
     addressPlaceholder: "e.g. Cheonjung-ro, Gangdong-gu, Seoul",
     addressSearchButton: "Move",
@@ -343,10 +746,23 @@ export default function Home() {
     return CONTENT_TYPES.find((type) => type.value === contentType);
   }, [contentType]);
 
+  const areaPresets = useMemo(() => {
+    return AREA_PRESETS.filter((preset) => preset.areaCode === selectedArea.code);
+  }, [selectedArea.code]);
+
   function selectArea(area: Area) {
     setSelectedArea(area);
     setSelectedPoint({ lat: area.lat, lng: area.lng });
     setSelectedLocationName(null);
+  }
+
+  function selectPreset(preset: AreaPreset) {
+    const presetText = preset.text[uiLanguage];
+    setSelectedPoint({ lat: preset.lat, lng: preset.lng });
+    setSelectedLocationName(presetText.name);
+    setPlaces([]);
+    setLastQuery(null);
+    mapRef.current?.setLevel(5);
   }
 
   function getCategoryLabel(category: string) {
@@ -580,6 +996,44 @@ export default function Home() {
                 </option>
               ))}
             </select>
+
+            <div className="mt-4">
+              <p className="text-sm font-semibold text-[#344054]">
+                {messages.recommendedAreas}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {areaPresets.map((preset) => {
+                  const presetText = preset.text[uiLanguage];
+                  const isSelected =
+                    selectedLocationName === presetText.name &&
+                    selectedPoint.lat === preset.lat &&
+                    selectedPoint.lng === preset.lng;
+
+                  return (
+                    <button
+                      className={`min-h-16 border p-2 text-left transition ${
+                        isSelected
+                          ? "border-[#2563eb] bg-[#eff6ff] text-[#101828]"
+                          : "border-[#d0d5dd] bg-white text-[#475467] hover:border-[#98a2b3]"
+                      }`}
+                      key={`${preset.areaCode}-${presetText.name}`}
+                      type="button"
+                      onClick={() => selectPreset(preset)}
+                    >
+                      <span className="block truncate text-sm font-semibold">
+                        {presetText.name}
+                      </span>
+                      <span className="mt-1 block truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-[#2563eb]">
+                        {presetText.label}
+                      </span>
+                      <span className="mt-1 block line-clamp-2 text-xs leading-4 text-[#667085]">
+                        {presetText.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <form className="mt-3" onSubmit={searchAddress}>
               <label className="text-sm font-semibold text-[#344054]">
