@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.contest.kroute.place.exception.PlaceNotFoundException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -22,6 +24,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(IllegalArgumentException.class)
 	public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException exception) {
 		return ResponseEntity.badRequest().body(errorBody(HttpStatus.BAD_REQUEST, exception.getMessage()));
+	}
+
+	@ExceptionHandler(PlaceNotFoundException.class)
+	public ResponseEntity<Map<String, Object>> handlePlaceNotFoundException(PlaceNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(errorBody(HttpStatus.NOT_FOUND, exception.getMessage()));
 	}
 
 	@ExceptionHandler(Exception.class)

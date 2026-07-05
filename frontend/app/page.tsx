@@ -38,6 +38,56 @@ type Place = {
   imageUrl: string | null;
 };
 
+type PlaceDetail = {
+  contentId: string;
+  category: string;
+  dataLanguage: string;
+  fallbackUsed: boolean;
+  title: string | null;
+  overview: string | null;
+  address: string | null;
+  phone: string | null;
+  homepage: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  primaryImageUrl: string | null;
+  imageUrls: string[];
+  visitInfo: {
+    openingHours: string | null;
+    closedDays: string | null;
+    useFee: string | null;
+    parking: string | null;
+    reservation: string | null;
+    informationCenter: string | null;
+    experienceGuide: string | null;
+    creditCard: string | null;
+    petAllowed: string | null;
+  };
+  restaurantInfo: {
+    firstMenu: string | null;
+    menu: string | null;
+    packing: string | null;
+    kidsFacility: string | null;
+    smoking: string | null;
+  } | null;
+  accommodationInfo: {
+    checkInTime: string | null;
+    checkOutTime: string | null;
+    roomCount: string | null;
+    roomType: string | null;
+    foodPlace: string | null;
+    subFacilities: string | null;
+    pickup: string | null;
+    bookingUrl: string | null;
+  } | null;
+  additionalInfo: Array<{
+    title: string | null;
+    description: string | null;
+    imageUrl: string | null;
+    attributes: Record<string, string>;
+  }>;
+};
+
 type ApiResponse<T> = {
   success: boolean;
   data: T;
@@ -623,6 +673,17 @@ const CATEGORY_LABELS: Record<string, Record<SupportedUiLanguage, string>> = {
   unknown: { ko: "기타", en: "Other" },
 };
 
+const ADDITIONAL_ATTRIBUTE_LABELS: Record<
+  string,
+  Record<SupportedUiLanguage, string>
+> = {
+  roomSize: { ko: "객실 크기", en: "Room size" },
+  baseOccupancy: { ko: "기준 인원", en: "Base occupancy" },
+  maxOccupancy: { ko: "최대 인원", en: "Maximum occupancy" },
+  offseasonFee: { ko: "비수기 요금", en: "Off-season rate" },
+  peakSeasonFee: { ko: "성수기 요금", en: "Peak-season rate" },
+};
+
 const LANGUAGES = [
   { value: "ko", label: "한국어" },
   { value: "en", label: "English" },
@@ -657,6 +718,46 @@ const UI_MESSAGES = {
     emptyResults: "검색 후 관광지 결과가 여기에 표시됩니다.",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
+    detailLoading: "상세 정보를 불러오는 중입니다.",
+    detailLoadError: "상세 정보를 불러오지 못했습니다.",
+    closeDetail: "상세 정보 닫기",
+    detailOverview: "소개",
+    visitInformation: "이용 정보",
+    openingHours: "운영 시간",
+    closedDays: "휴무일",
+    useFee: "이용 요금",
+    parking: "주차",
+    reservation: "예약",
+    informationCenter: "문의처",
+    experienceGuide: "체험 안내",
+    creditCard: "카드 사용",
+    petAllowed: "반려동물",
+    restaurantInformation: "음식점 정보",
+    firstMenu: "대표 메뉴",
+    menu: "취급 메뉴",
+    packing: "포장",
+    kidsFacility: "어린이 시설",
+    smoking: "흡연",
+    accommodationInformation: "숙박 정보",
+    checkInTime: "체크인",
+    checkOutTime: "체크아웃",
+    roomCount: "객실 수",
+    roomType: "객실 유형",
+    foodPlace: "식음료장",
+    subFacilities: "부대시설",
+    pickup: "픽업",
+    booking: "예약 페이지",
+    additionalInformation: "추가 정보",
+    gallery: "추가 이미지",
+    website: "홈페이지",
+    phone: "전화",
+    sourceLanguage: "관광 데이터 언어",
+    fallbackNotice: "선택 언어의 상세 정보가 없어 다른 언어 정보가 표시됩니다.",
+    roomSize: "객실 크기",
+    baseOccupancy: "기준 인원",
+    maxOccupancy: "최대 인원",
+    offseasonFee: "비수기 요금",
+    peakSeasonFee: "성수기 요금",
     mapMissingKeyTitle: "Kakao Maps 키가 필요합니다",
     mapLoadErrorTitle: "Kakao Maps를 불러오지 못했습니다",
     mapLoadingTitle: "Kakao Maps를 불러오는 중입니다",
@@ -689,6 +790,46 @@ const UI_MESSAGES = {
     emptyResults: "Nearby tourism results will appear here after search.",
     fallbackCategory: "Spots",
     imageFallback: "No image",
+    detailLoading: "Loading place details.",
+    detailLoadError: "Could not load place details.",
+    closeDetail: "Close details",
+    detailOverview: "Overview",
+    visitInformation: "Visitor information",
+    openingHours: "Opening hours",
+    closedDays: "Closed days",
+    useFee: "Admission",
+    parking: "Parking",
+    reservation: "Reservation",
+    informationCenter: "Information",
+    experienceGuide: "Experience",
+    creditCard: "Credit cards",
+    petAllowed: "Pets",
+    restaurantInformation: "Restaurant information",
+    firstMenu: "Signature menu",
+    menu: "Menu",
+    packing: "Takeout",
+    kidsFacility: "Kids facilities",
+    smoking: "Smoking",
+    accommodationInformation: "Accommodation information",
+    checkInTime: "Check-in",
+    checkOutTime: "Check-out",
+    roomCount: "Rooms",
+    roomType: "Room types",
+    foodPlace: "Dining",
+    subFacilities: "Facilities",
+    pickup: "Pickup",
+    booking: "Booking page",
+    additionalInformation: "Additional information",
+    gallery: "More photos",
+    website: "Website",
+    phone: "Phone",
+    sourceLanguage: "Tourism data language",
+    fallbackNotice: "Details are shown in another language because selected-language data was unavailable.",
+    roomSize: "Room size",
+    baseOccupancy: "Base occupancy",
+    maxOccupancy: "Maximum occupancy",
+    offseasonFee: "Off-season rate",
+    peakSeasonFee: "Peak-season rate",
     mapMissingKeyTitle: "Kakao Maps key is required",
     mapLoadErrorTitle: "Kakao Maps could not be loaded",
     mapLoadingTitle: "Loading Kakao Maps",
@@ -702,6 +843,18 @@ const UI_MESSAGES = {
   },
 } satisfies Record<SupportedUiLanguage, Record<string, string>>;
 
+type DetailRow = [label: string, value: string];
+
+function compactDetailRows(
+  rows: Array<[label: string, value: string | null | undefined]>,
+): DetailRow[] {
+  return rows.filter((row): row is DetailRow => Boolean(row[1]?.trim()));
+}
+
+function isExternalUrl(value: string | null | undefined): value is string {
+  return Boolean(value && /^https?:\/\//i.test(value));
+}
+
 export default function Home() {
   const [selectedArea, setSelectedArea] = useState<Area>(AREAS[0]);
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint>({
@@ -713,10 +866,19 @@ export default function Home() {
   const [addressQuery, setAddressQuery] = useState("");
   const [contentType, setContentType] = useState(CONTENT_TYPES[0].value);
   const [places, setPlaces] = useState<Place[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAddressSearching, setIsAddressSearching] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(
+    null,
+  );
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [failedDetailImageUrls, setFailedDetailImageUrls] = useState<Set<string>>(
     () => new Set(),
   );
   const [mapStatus, setMapStatus] = useState<
@@ -732,6 +894,7 @@ export default function Home() {
   const mapRef = useRef<KakaoMap | null>(null);
   const selectedMarkerRef = useRef<KakaoMarker | null>(null);
   const placeMarkersRef = useRef<KakaoMarker[]>([]);
+  const detailRequestIdRef = useRef(0);
 
   const apiBaseUrl = useMemo(() => {
     return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081";
@@ -750,13 +913,65 @@ export default function Home() {
     return AREA_PRESETS.filter((preset) => preset.areaCode === selectedArea.code);
   }, [selectedArea.code]);
 
+  const visitRows = placeDetail
+    ? compactDetailRows([
+        [messages.openingHours, placeDetail.visitInfo.openingHours],
+        [messages.closedDays, placeDetail.visitInfo.closedDays],
+        [messages.useFee, placeDetail.visitInfo.useFee],
+        [messages.parking, placeDetail.visitInfo.parking],
+        [messages.reservation, placeDetail.visitInfo.reservation],
+        [messages.informationCenter, placeDetail.visitInfo.informationCenter],
+        [messages.experienceGuide, placeDetail.visitInfo.experienceGuide],
+        [messages.creditCard, placeDetail.visitInfo.creditCard],
+        [messages.petAllowed, placeDetail.visitInfo.petAllowed],
+      ])
+    : [];
+
+  const restaurantRows = placeDetail?.restaurantInfo
+    ? compactDetailRows([
+        [messages.firstMenu, placeDetail.restaurantInfo.firstMenu],
+        [messages.menu, placeDetail.restaurantInfo.menu],
+        [messages.packing, placeDetail.restaurantInfo.packing],
+        [messages.kidsFacility, placeDetail.restaurantInfo.kidsFacility],
+        [messages.smoking, placeDetail.restaurantInfo.smoking],
+      ])
+    : [];
+
+  const accommodationRows = placeDetail?.accommodationInfo
+    ? compactDetailRows([
+        [messages.checkInTime, placeDetail.accommodationInfo.checkInTime],
+        [messages.checkOutTime, placeDetail.accommodationInfo.checkOutTime],
+        [messages.roomCount, placeDetail.accommodationInfo.roomCount],
+        [messages.roomType, placeDetail.accommodationInfo.roomType],
+        [messages.foodPlace, placeDetail.accommodationInfo.foodPlace],
+        [messages.subFacilities, placeDetail.accommodationInfo.subFacilities],
+        [messages.pickup, placeDetail.accommodationInfo.pickup],
+      ])
+    : [];
+
+  function closePlaceDetail() {
+    detailRequestIdRef.current += 1;
+    setSelectedPlace(null);
+    setPlaceDetail(null);
+    setDetailErrorMessage(null);
+    setIsDetailLoading(false);
+    setFailedDetailImageUrls(new Set());
+  }
+
+  function changeLanguage(nextLanguage: string) {
+    setLanguage(nextLanguage);
+    closePlaceDetail();
+  }
+
   function selectArea(area: Area) {
+    closePlaceDetail();
     setSelectedArea(area);
     setSelectedPoint({ lat: area.lat, lng: area.lng });
     setSelectedLocationName(null);
   }
 
   function selectPreset(preset: AreaPreset) {
+    closePlaceDetail();
     const presetText = preset.text[uiLanguage];
     setSelectedPoint({ lat: preset.lat, lng: preset.lng });
     setSelectedLocationName(presetText.name);
@@ -770,6 +985,61 @@ export default function Home() {
       CATEGORY_LABELS[category]?.[uiLanguage] ??
       (category ? category : CATEGORY_LABELS.unknown[uiLanguage])
     );
+  }
+
+  function getAdditionalAttributeLabel(key: string) {
+    return ADDITIONAL_ATTRIBUTE_LABELS[key]?.[uiLanguage] ?? key;
+  }
+
+  async function openPlaceDetail(place: Place) {
+    const requestId = detailRequestIdRef.current + 1;
+    detailRequestIdRef.current = requestId;
+    setSelectedPlace(place);
+    setPlaceDetail(null);
+    setDetailErrorMessage(null);
+    setIsDetailLoading(true);
+    setFailedDetailImageUrls(new Set());
+
+    if (window.kakao?.maps && mapRef.current) {
+      mapRef.current.setCenter(
+        new window.kakao.maps.LatLng(place.latitude, place.longitude),
+      );
+    }
+
+    const params = new URLSearchParams({
+      lang: language,
+      contentType: place.category,
+    });
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/places/${encodeURIComponent(place.contentId)}?${params.toString()}`,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`${messages.detailLoadError} (${response.status})`);
+      }
+
+      const result = (await response.json()) as ApiResponse<PlaceDetail>;
+      if (detailRequestIdRef.current === requestId) {
+        setPlaceDetail(result.data);
+      }
+    } catch (error) {
+      if (detailRequestIdRef.current === requestId) {
+        setDetailErrorMessage(
+          error instanceof Error ? error.message : messages.detailLoadError,
+        );
+      }
+    } finally {
+      if (detailRequestIdRef.current === requestId) {
+        setIsDetailLoading(false);
+      }
+    }
   }
 
   function searchAddress(event: React.FormEvent<HTMLFormElement>) {
@@ -810,11 +1080,13 @@ export default function Home() {
       setSelectedLocationName(matchedAddress.address_name || query);
       setPlaces([]);
       setLastQuery(null);
+      closePlaceDetail();
       mapRef.current?.setLevel(5);
     });
   }
 
   async function searchNearbyPlaces() {
+    closePlaceDetail();
     setIsLoading(true);
     setErrorMessage(null);
     setFailedImageIds(new Set());
@@ -960,9 +1232,25 @@ export default function Home() {
       <div className="grid min-h-screen lg:grid-cols-[390px_1fr]">
         <aside className="relative z-20 flex h-full flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5">
           <header className="border-b border-[#e1e7ef] pb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
-              Global K-Route
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
+                Global K-Route
+              </p>
+              <label className="flex min-w-[132px] flex-col gap-1 text-xs font-semibold text-[#344054]">
+                {messages.language}
+                <select
+                  className="h-9 border border-[#d0d5dd] bg-white px-2 text-sm font-semibold text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
+                  value={language}
+                  onChange={(event) => changeLanguage(event.target.value)}
+                >
+                  {LANGUAGES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#101828]">
               {messages.heroTitle}
             </h1>
@@ -1076,7 +1364,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="mt-4 grid grid-cols-[1fr_108px] gap-3">
+            <div className="mt-4">
               <div>
                 <label className="text-sm font-semibold text-[#344054]">
                   {messages.radius}
@@ -1093,23 +1381,6 @@ export default function Home() {
                   />
                   <span className="text-sm text-[#667085]">m</span>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-[#344054]">
-                  {messages.language}
-                </label>
-                <select
-                  className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
-                  value={language}
-                  onChange={(event) => setLanguage(event.target.value)}
-                >
-                  {LANGUAGES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -1150,9 +1421,15 @@ export default function Home() {
               ) : null}
 
               {places.map((place) => (
-                <article
-                  className="border border-[#e1e7ef] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+                <button
+                  className={`w-full border bg-white p-3 text-left shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition ${
+                    selectedPlace?.contentId === place.contentId
+                      ? "border-[#2563eb] ring-2 ring-[#dbeafe]"
+                      : "border-[#e1e7ef] hover:border-[#98a2b3]"
+                  }`}
                   key={place.contentId}
+                  type="button"
+                  onClick={() => openPlaceDetail(place)}
                 >
                   <div className="flex gap-3">
                     {place.imageUrl && !failedImageIds.has(place.contentId) ? (
@@ -1197,7 +1474,7 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                </article>
+                </button>
               ))}
             </div>
           </section>
@@ -1295,6 +1572,311 @@ export default function Home() {
               ))}
             </div>
           </div>
+
+          {selectedPlace ? (
+            <aside className="absolute inset-3 z-30 overflow-y-auto border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[460px]">
+              <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e1e7ef] bg-white/96 p-4 backdrop-blur">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
+                    {getCategoryLabel(selectedPlace.category)}
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-[#101828]">
+                    {placeDetail?.title || selectedPlace.title}
+                  </h2>
+                </div>
+                <button
+                  aria-label={messages.closeDetail}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d0d5dd] bg-white text-xl text-[#475467] transition hover:bg-[#f2f4f7]"
+                  title={messages.closeDetail}
+                  type="button"
+                  onClick={closePlaceDetail}
+                >
+                  ×
+                </button>
+              </header>
+
+              {isDetailLoading ? (
+                <div
+                  aria-live="polite"
+                  className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-[#667085]"
+                >
+                  {messages.detailLoading}
+                </div>
+              ) : null}
+
+              {detailErrorMessage ? (
+                <div className="m-4 border border-[#fecaca] bg-[#fff1f2] p-4 text-sm leading-6 text-[#b42318]">
+                  {detailErrorMessage}
+                </div>
+              ) : null}
+
+              {placeDetail ? (
+                <div>
+                  {placeDetail.primaryImageUrl &&
+                  !failedDetailImageUrls.has(placeDetail.primaryImageUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={placeDetail.title || selectedPlace.title}
+                      className="h-56 w-full object-cover"
+                      src={placeDetail.primaryImageUrl}
+                      onError={() => {
+                        setFailedDetailImageUrls((previous) => {
+                          const next = new Set(previous);
+                          next.add(placeDetail.primaryImageUrl!);
+                          return next;
+                        });
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-36 items-center justify-center bg-[#edf3f8] text-sm font-semibold text-[#667085]">
+                      {messages.imageFallback}
+                    </div>
+                  )}
+
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="bg-[#eef4ff] px-2 py-1 text-xs font-semibold text-[#2563eb]">
+                        {messages.sourceLanguage}:{" "}
+                        {placeDetail.dataLanguage.toUpperCase()}
+                      </span>
+                      {placeDetail.fallbackUsed ? (
+                        <span className="bg-[#fff7ed] px-2 py-1 text-xs font-semibold text-[#b54708]">
+                          {messages.fallbackNotice}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {placeDetail.address ? (
+                      <p className="mt-3 text-sm leading-6 text-[#475467]">
+                        {placeDetail.address}
+                      </p>
+                    ) : null}
+
+                    {placeDetail.overview ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.detailOverview}
+                        </h3>
+                        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#475467]">
+                          {placeDetail.overview}
+                        </p>
+                      </section>
+                    ) : null}
+
+                    {visitRows.length > 0 ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.visitInformation}
+                        </h3>
+                        <dl className="mt-3 divide-y divide-[#eef2f6]">
+                          {visitRows.map(([label, value]) => (
+                            <div
+                              className="grid grid-cols-[112px_1fr] gap-3 py-3 text-sm"
+                              key={label}
+                            >
+                              <dt className="font-semibold text-[#344054]">
+                                {label}
+                              </dt>
+                              <dd className="whitespace-pre-line leading-5 text-[#667085]">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    ) : null}
+
+                    {restaurantRows.length > 0 ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.restaurantInformation}
+                        </h3>
+                        <dl className="mt-3 divide-y divide-[#eef2f6]">
+                          {restaurantRows.map(([label, value]) => (
+                            <div
+                              className="grid grid-cols-[112px_1fr] gap-3 py-3 text-sm"
+                              key={label}
+                            >
+                              <dt className="font-semibold text-[#344054]">
+                                {label}
+                              </dt>
+                              <dd className="whitespace-pre-line leading-5 text-[#667085]">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    ) : null}
+
+                    {accommodationRows.length > 0 ||
+                    isExternalUrl(placeDetail.accommodationInfo?.bookingUrl) ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.accommodationInformation}
+                        </h3>
+                        <dl className="mt-3 divide-y divide-[#eef2f6]">
+                          {accommodationRows.map(([label, value]) => (
+                            <div
+                              className="grid grid-cols-[112px_1fr] gap-3 py-3 text-sm"
+                              key={label}
+                            >
+                              <dt className="font-semibold text-[#344054]">
+                                {label}
+                              </dt>
+                              <dd className="whitespace-pre-line leading-5 text-[#667085]">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                        {isExternalUrl(
+                          placeDetail.accommodationInfo?.bookingUrl,
+                        ) ? (
+                          <a
+                            className="mt-3 inline-flex min-h-10 items-center border border-[#2563eb] px-3 text-sm font-semibold text-[#2563eb] transition hover:bg-[#eff6ff]"
+                            href={placeDetail.accommodationInfo.bookingUrl}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {messages.booking}
+                          </a>
+                        ) : null}
+                      </section>
+                    ) : null}
+
+                    {placeDetail.phone ||
+                    isExternalUrl(placeDetail.homepage) ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.informationCenter}
+                        </h3>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {placeDetail.phone ? (
+                            <a
+                              className="inline-flex min-h-10 items-center border border-[#d0d5dd] px-3 text-sm font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
+                              href={`tel:${placeDetail.phone}`}
+                            >
+                              {messages.phone}: {placeDetail.phone}
+                            </a>
+                          ) : null}
+                          {isExternalUrl(placeDetail.homepage) ? (
+                            <a
+                              className="inline-flex min-h-10 items-center border border-[#2563eb] px-3 text-sm font-semibold text-[#2563eb] transition hover:bg-[#eff6ff]"
+                              href={placeDetail.homepage}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              {messages.website}
+                            </a>
+                          ) : null}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {placeDetail.additionalInfo.length > 0 ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.additionalInformation}
+                        </h3>
+                        <div className="mt-3 grid gap-3">
+                          {placeDetail.additionalInfo.map((item, index) => (
+                            <article
+                              className="border border-[#e1e7ef] bg-[#f8fafc] p-3"
+                              key={`${item.title ?? "detail"}-${index}`}
+                            >
+                              {item.imageUrl &&
+                              !failedDetailImageUrls.has(item.imageUrl) ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  alt={item.title ?? ""}
+                                  className="mb-3 h-36 w-full object-cover"
+                                  src={item.imageUrl}
+                                  onError={() => {
+                                    setFailedDetailImageUrls((previous) => {
+                                      const next = new Set(previous);
+                                      next.add(item.imageUrl!);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              ) : null}
+                              {item.title ? (
+                                <h4 className="text-sm font-semibold text-[#101828]">
+                                  {item.title}
+                                </h4>
+                              ) : null}
+                              {item.description ? (
+                                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#667085]">
+                                  {item.description}
+                                </p>
+                              ) : null}
+                              {Object.keys(item.attributes).length > 0 ? (
+                                <dl className="mt-3 divide-y divide-[#e1e7ef]">
+                                  {Object.entries(item.attributes).map(
+                                    ([key, value]) => (
+                                      <div
+                                        className="grid grid-cols-[110px_1fr] gap-2 py-2 text-xs"
+                                        key={key}
+                                      >
+                                        <dt className="font-semibold text-[#344054]">
+                                          {getAdditionalAttributeLabel(key)}
+                                        </dt>
+                                        <dd className="text-[#667085]">
+                                          {value}
+                                        </dd>
+                                      </div>
+                                    ),
+                                  )}
+                                </dl>
+                              ) : null}
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {placeDetail.imageUrls.filter(
+                      (imageUrl) =>
+                        imageUrl !== placeDetail.primaryImageUrl &&
+                        !failedDetailImageUrls.has(imageUrl),
+                    ).length > 0 ? (
+                      <section className="mt-5 border-t border-[#e1e7ef] pt-5">
+                        <h3 className="text-base font-semibold text-[#101828]">
+                          {messages.gallery}
+                        </h3>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {placeDetail.imageUrls
+                            .filter(
+                              (imageUrl) =>
+                                imageUrl !== placeDetail.primaryImageUrl &&
+                                !failedDetailImageUrls.has(imageUrl),
+                            )
+                            .map((imageUrl) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                alt=""
+                                className="aspect-[4/3] w-full object-cover"
+                                key={imageUrl}
+                                loading="lazy"
+                                src={imageUrl}
+                                onError={() => {
+                                  setFailedDetailImageUrls((previous) => {
+                                    const next = new Set(previous);
+                                    next.add(imageUrl);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            ))}
+                        </div>
+                      </section>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
 
           {AREAS.map((area) => {
             const isSelected = selectedArea.code === area.code;
