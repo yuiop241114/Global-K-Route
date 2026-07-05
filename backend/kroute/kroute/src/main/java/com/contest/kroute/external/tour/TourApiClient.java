@@ -189,14 +189,7 @@ public class TourApiClient {
 
 	private JsonNode requestDetailCommon(String contentId, String language) {
 		UriComponentsBuilder builder = createTourApiUriBuilder(language, DETAIL_COMMON_OPERATION)
-				.queryParam("contentId", contentId)
-				.queryParam("defaultYN", "Y")
-				.queryParam("firstImageYN", "Y")
-				.queryParam("areacodeYN", "Y")
-				.queryParam("catcodeYN", "Y")
-				.queryParam("addrinfoYN", "Y")
-				.queryParam("mapinfoYN", "Y")
-				.queryParam("overviewYN", "Y");
+				.queryParam("contentId", contentId);
 		return requestJson(builder);
 	}
 
@@ -217,8 +210,6 @@ public class TourApiClient {
 	private JsonNode requestDetailImages(String contentId, String language) {
 		UriComponentsBuilder builder = createTourApiUriBuilder(language, DETAIL_IMAGE_OPERATION)
 				.queryParam("contentId", contentId)
-				.queryParam("imageYN", "Y")
-				.queryParam("subImageYN", "Y")
 				.queryParam("numOfRows", 30)
 				.queryParam("pageNo", 1);
 		return requestJson(builder);
@@ -234,10 +225,33 @@ public class TourApiClient {
 	}
 
 	private JsonNode requestJson(UriComponentsBuilder builder) {
-		return restClient.get()
+		JsonNode response = restClient.get()
 				.uri(builder.build(true).toUri())
 				.retrieve()
 				.body(JsonNode.class);
+		validateTourApiResponse(response);
+		return response;
+	}
+
+	private void validateTourApiResponse(JsonNode response) {
+		if (response == null) {
+			throw new IllegalStateException("TourAPI returned an empty response.");
+		}
+
+		String topLevelCode = response.path("resultCode").asText("");
+		if (!topLevelCode.isBlank() && !"0000".equals(topLevelCode)) {
+			throw new IllegalStateException(
+					"TourAPI request failed: " + response.path("resultMsg").asText(topLevelCode)
+			);
+		}
+
+		JsonNode header = response.path("response").path("header");
+		String headerCode = header.path("resultCode").asText("");
+		if (!headerCode.isBlank() && !"0000".equals(headerCode)) {
+			throw new IllegalStateException(
+					"TourAPI request failed: " + header.path("resultMsg").asText(headerCode)
+			);
+		}
 	}
 
 	private JsonNode requestOptionalDetail(
@@ -247,7 +261,7 @@ public class TourApiClient {
 	) {
 		try {
 			return request.get();
-		} catch (RestClientException exception) {
+		} catch (RestClientException | IllegalStateException exception) {
 			log.warn(
 					"Optional TourAPI detail request failed. operation={}, contentId={}, reason={}",
 					operation,
