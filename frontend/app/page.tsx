@@ -1228,9 +1228,9 @@ export default function Home() {
   }, [places]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#e9eef3] text-[#101828]">
-      <div className="grid min-h-screen lg:grid-cols-[390px_1fr]">
-        <aside className="relative z-20 flex h-full flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5">
+    <main className="min-h-screen overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
+      <div className="grid min-h-screen lg:h-full lg:min-h-0 lg:grid-cols-[390px_1fr]">
+        <aside className="relative z-20 flex flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
           <header className="border-b border-[#e1e7ef] pb-4">
             <div className="flex items-start justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
@@ -1413,7 +1413,7 @@ export default function Home() {
               </div>
             ) : null}
 
-            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
               {places.length === 0 && !errorMessage ? (
                 <div className="flex flex-1 items-center justify-center border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
                   {messages.emptyResults}
@@ -1480,7 +1480,7 @@ export default function Home() {
           </section>
         </aside>
 
-        <section className="relative min-h-[720px] overflow-hidden bg-[#dfe8ef]">
+        <section className="relative min-h-[720px] overflow-hidden bg-[#dfe8ef] lg:h-full lg:min-h-0">
           <div ref={mapContainerRef} className="absolute inset-0 z-0" />
           <div
             className={`absolute inset-0 bg-[linear-gradient(#cfdbe5_1px,transparent_1px),linear-gradient(90deg,#cfdbe5_1px,transparent_1px)] bg-[size:56px_56px] ${
