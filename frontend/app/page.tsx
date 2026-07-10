@@ -700,6 +700,9 @@ const UI_MESSAGES = {
   ko: {
     heroTitle: "지도에서 고르는 한국 여행",
     privacyNotice: "현재 위치 자동 수집 없음",
+    searchOptions: "검색 옵션",
+    collapseSearchOptions: "옵션 접기",
+    expandSearchOptions: "옵션 펼치기",
     searchBase: "기준 지역",
     recommendedAreas: "추천 관광권역",
     addressSearch: "상세 주소 검색",
@@ -772,6 +775,9 @@ const UI_MESSAGES = {
   en: {
     heroTitle: "Discover Korea by map",
     privacyNotice: "No live GPS collection",
+    searchOptions: "Search options",
+    collapseSearchOptions: "Collapse",
+    expandSearchOptions: "Expand",
     searchBase: "Search base",
     recommendedAreas: "Recommended zones",
     addressSearch: "Detailed address",
@@ -863,6 +869,8 @@ export default function Home() {
   });
   const [radius, setRadius] = useState("1000");
   const [language, setLanguage] = useState("ko");
+  const [isSearchOptionsCollapsed, setIsSearchOptionsCollapsed] =
+    useState(false);
   const [addressQuery, setAddressQuery] = useState("");
   const [contentType, setContentType] = useState(CONTENT_TYPES[0].value);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -1115,6 +1123,7 @@ export default function Home() {
 
       const result = (await response.json()) as ApiResponse<Place[]>;
       setPlaces(result.data);
+      setIsSearchOptionsCollapsed(true);
       setLastQuery(
         `${selectedLocationName ?? selectedAreaText.name} / ${
           selectedContentType?.labels[uiLanguage] ?? messages.fallbackCategory
@@ -1262,11 +1271,49 @@ export default function Home() {
             </div>
           </header>
 
-          <section className="border-b border-[#e1e7ef] py-4">
-            <label className="text-sm font-semibold text-[#344054]">
-              {messages.searchBase}
-            </label>
-            <select
+          <section className="shrink-0 border-b border-[#e1e7ef] py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#101828]">
+                  {messages.searchOptions}
+                </p>
+                {isSearchOptionsCollapsed ? (
+                  <p className="mt-1 truncate text-xs text-[#667085]">
+                    {selectedLocationName ?? selectedAreaText.name} ·{" "}
+                    {selectedContentType?.labels[uiLanguage] ??
+                      messages.fallbackCategory}{" "}
+                    · {radius}m
+                  </p>
+                ) : null}
+              </div>
+              <button
+                aria-expanded={!isSearchOptionsCollapsed}
+                className="flex h-9 shrink-0 items-center gap-1 border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
+                title={
+                  isSearchOptionsCollapsed
+                    ? messages.expandSearchOptions
+                    : messages.collapseSearchOptions
+                }
+                type="button"
+                onClick={() =>
+                  setIsSearchOptionsCollapsed((previous) => !previous)
+                }
+              >
+                <span aria-hidden="true">
+                  {isSearchOptionsCollapsed ? "▾" : "▴"}
+                </span>
+                {isSearchOptionsCollapsed
+                  ? messages.expandSearchOptions
+                  : messages.collapseSearchOptions}
+              </button>
+            </div>
+
+            {!isSearchOptionsCollapsed ? (
+              <div className="mt-4">
+                <label className="text-sm font-semibold text-[#344054]">
+                  {messages.searchBase}
+                </label>
+                <select
               className="mt-2 h-12 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-medium text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
               value={selectedArea.code}
               onChange={(event) => {
@@ -1389,9 +1436,11 @@ export default function Home() {
               disabled={isLoading}
               type="button"
               onClick={searchNearbyPlaces}
-            >
-              {isLoading ? messages.searching : messages.searchButton}
-            </button>
+                >
+                  {isLoading ? messages.searching : messages.searchButton}
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <section className="flex min-h-0 flex-1 flex-col py-4">
