@@ -1240,29 +1240,13 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       <div className="grid min-h-screen lg:h-full lg:min-h-0 lg:grid-cols-[390px_1fr]">
-        <aside className="relative z-20 flex flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
+        <aside className="relative z-20 flex flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
           <header className="border-b border-[#e1e7ef] pb-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
                 Global K-Route
               </p>
               <AccountAccess language={uiLanguage} />
-            </div>
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <label className="flex min-w-[148px] flex-col gap-1 text-xs font-semibold text-[#344054]">
-                {messages.language}
-                <select
-                  className="h-9 border border-[#d0d5dd] bg-white px-2 text-sm font-semibold text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
-                  value={language}
-                  onChange={(event) => changeLanguage(event.target.value)}
-                >
-                  {LANGUAGES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#101828]">
               {messages.heroTitle}
@@ -1276,7 +1260,7 @@ export default function Home() {
           </header>
 
           <section className="shrink-0 border-b border-[#e1e7ef] py-3">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#101828]">
                   {messages.searchOptions}
@@ -1290,26 +1274,45 @@ export default function Home() {
                   </p>
                 ) : null}
               </div>
-              <button
-                aria-expanded={!isSearchOptionsCollapsed}
-                className="flex h-9 shrink-0 items-center gap-1 border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
-                title={
-                  isSearchOptionsCollapsed
-                    ? messages.expandSearchOptions
-                    : messages.collapseSearchOptions
-                }
-                type="button"
-                onClick={() =>
-                  setIsSearchOptionsCollapsed((previous) => !previous)
-                }
-              >
-                <span aria-hidden="true">
-                  {isSearchOptionsCollapsed ? "▾" : "▴"}
-                </span>
-                {isSearchOptionsCollapsed
-                  ? messages.expandSearchOptions
-                  : messages.collapseSearchOptions}
-              </button>
+              <div className="flex shrink-0 items-end gap-2">
+                <label className="flex w-[126px] flex-col gap-1 text-xs font-semibold text-[#344054]">
+                  {messages.language}
+                  <select
+                    aria-label={messages.language}
+                    className="h-9 w-full border border-[#d0d5dd] bg-white px-2 text-sm font-semibold text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"
+                    value={language}
+                    onChange={(event) => changeLanguage(event.target.value)}
+                  >
+                    {LANGUAGES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  aria-expanded={!isSearchOptionsCollapsed}
+                  aria-label={
+                    isSearchOptionsCollapsed
+                      ? messages.expandSearchOptions
+                      : messages.collapseSearchOptions
+                  }
+                  className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d0d5dd] bg-white text-sm font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
+                  title={
+                    isSearchOptionsCollapsed
+                      ? messages.expandSearchOptions
+                      : messages.collapseSearchOptions
+                  }
+                  type="button"
+                  onClick={() =>
+                    setIsSearchOptionsCollapsed((previous) => !previous)
+                  }
+                >
+                  <span aria-hidden="true">
+                    {isSearchOptionsCollapsed ? "▾" : "▴"}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {!isSearchOptionsCollapsed ? (
@@ -1447,7 +1450,7 @@ export default function Home() {
             ) : null}
           </section>
 
-          <section className="flex min-h-0 flex-1 flex-col py-4">
+          <section className="flex min-h-0 flex-1 flex-col py-4 lg:min-h-[360px] lg:flex-none">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">{messages.resultsTitle}</h2>
@@ -1466,7 +1469,7 @@ export default function Home() {
               </div>
             ) : null}
 
-            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
+            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1 lg:overflow-visible">
               {places.length === 0 && !errorMessage ? (
                 <div className="flex flex-1 items-center justify-center border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
                   {messages.emptyResults}
