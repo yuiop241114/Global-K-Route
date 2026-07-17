@@ -122,7 +122,10 @@ class TourApiClientTest {
 				new AppProperties.Cors("http://localhost:3000"),
 				new AppProperties.TourApi("https://apis.example.com/B551011", "test-key"),
 				new AppProperties.Kakao(""),
-				new AppProperties.Upstash(new AppProperties.Upstash.Redis("", ""))
+				new AppProperties.Upstash(new AppProperties.Upstash.Redis("", "")),
+				new AppProperties.Auth(false, 7, 30),
+				new AppProperties.Frontend("http://localhost:3000"),
+				new AppProperties.Mailjet("https://api.mailjet.com/v3.1", "", "", "", "Global K-Route")
 		);
 	}
 }

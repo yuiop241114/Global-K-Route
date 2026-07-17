@@ -28,6 +28,7 @@ next-env.d.ts
 
 # Java / Gradle build output
 .gradle/
+.gradle-work/
 build/
 out/
 bin/
@@ -44,3 +45,6 @@ bin/
 
 # Local helper scripts
 /scripts/start-backend-dev.ps1
+
+# Local database setup scripts
+/backend/kroute/kroute/src/main/resources/db/manual/001_auth_schema.sql

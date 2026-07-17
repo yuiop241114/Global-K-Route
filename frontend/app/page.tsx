@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import AccountAccess from "@/app/components/AccountAccess";
 
 type Area = {
   code: number;
@@ -905,7 +906,7 @@ export default function Home() {
   const detailRequestIdRef = useRef(0);
 
   const apiBaseUrl = useMemo(() => {
-    return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081";
+    return "/backend-api";
   }, []);
 
   const kakaoMapAppKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY;
@@ -1241,11 +1242,14 @@ export default function Home() {
       <div className="grid min-h-screen lg:h-full lg:min-h-0 lg:grid-cols-[390px_1fr]">
         <aside className="relative z-20 flex flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
           <header className="border-b border-[#e1e7ef] pb-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
                 Global K-Route
               </p>
-              <label className="flex min-w-[132px] flex-col gap-1 text-xs font-semibold text-[#344054]">
+              <AccountAccess language={uiLanguage} />
+            </div>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <label className="flex min-w-[148px] flex-col gap-1 text-xs font-semibold text-[#344054]">
                 {messages.language}
                 <select
                   className="h-9 border border-[#d0d5dd] bg-white px-2 text-sm font-semibold text-[#101828] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#dbeafe]"

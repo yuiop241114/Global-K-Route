@@ -2,6 +2,7 @@ package com.contest.kroute.exception;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -12,13 +13,29 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.contest.kroute.place.exception.PlaceNotFoundException;
+import com.contest.kroute.auth.exception.AuthException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-	@ExceptionHandler({ ConstraintViolationException.class, MethodArgumentNotValidException.class })
-	public ResponseEntity<Map<String, Object>> handleValidationException(Exception exception) {
-		return ResponseEntity.badRequest().body(errorBody(HttpStatus.BAD_REQUEST, exception.getMessage()));
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValidException(
+			MethodArgumentNotValidException exception) {
+		String message = exception.getBindingResult().getFieldErrors().stream()
+				.map(error -> error.getField() + ": " + error.getDefaultMessage())
+				.distinct()
+				.collect(Collectors.joining(", "));
+		return ResponseEntity.badRequest().body(errorBody(HttpStatus.BAD_REQUEST, message));
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<Map<String, Object>> handleConstraintViolationException(
+			ConstraintViolationException exception) {
+		String message = exception.getConstraintViolations().stream()
+				.map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+				.distinct()
+				.collect(Collectors.joining(", "));
+		return ResponseEntity.badRequest().body(errorBody(HttpStatus.BAD_REQUEST, message));
 	}
 
 	@ExceptionHandler(IllegalArgumentException.class)
@@ -30,6 +47,12 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<Map<String, Object>> handlePlaceNotFoundException(PlaceNotFoundException exception) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(errorBody(HttpStatus.NOT_FOUND, exception.getMessage()));
+	}
+
+	@ExceptionHandler(AuthException.class)
+	public ResponseEntity<Map<String, Object>> handleAuthException(AuthException exception) {
+		return ResponseEntity.status(exception.getStatus())
+				.body(errorBody(exception.getStatus(), exception.getMessage()));
 	}
 
 	@ExceptionHandler(Exception.class)

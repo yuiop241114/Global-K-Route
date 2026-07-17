@@ -7,7 +7,10 @@ public record AppProperties(
 		Cors cors,
 		TourApi tourApi,
 		Kakao kakao,
-		Upstash upstash
+		Upstash upstash,
+		Auth auth,
+		Frontend frontend,
+		Mailjet mailjet
 ) {
 	public record Cors(String allowedOrigins) {
 	}
@@ -21,5 +24,14 @@ public record AppProperties(
 	public record Upstash(Redis redis) {
 		public record Redis(String restUrl, String restToken) {
 		}
+	}
+
+	public record Auth(boolean secureCookie, long sessionDays, long passwordResetMinutes) {
+	}
+
+	public record Frontend(String baseUrl) {
+	}
+
+	public record Mailjet(String baseUrl, String apiKey, String secretKey, String fromEmail, String fromName) {
 	}
 }
