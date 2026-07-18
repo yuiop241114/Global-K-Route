@@ -47,4 +47,4 @@ bin/
 /scripts/start-backend-dev.ps1
 
 # Local database setup scripts
-/backend/kroute/kroute/src/main/resources/db/manual/001_auth_schema.sql
+/backend/kroute/kroute/src/main/resources/db/manual/*.sql

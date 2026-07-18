@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bookmark } from "lucide-react";
 import { backendApi } from "@/app/lib/backend-api";
 
 type Language = "ko" | "en";
 type Mode = "login" | "signup" | "recover" | "reset";
 type RecoveryAction = "username" | "password";
 
-type User = {
+export type AccountUser = {
   id: number;
   username: string;
   email: string;
@@ -15,11 +16,12 @@ type User = {
 
 type Session = {
   authenticated: boolean;
-  user: User | null;
+  user: AccountUser | null;
 };
 
 const COPY = {
   ko: {
+    savedPlaces: "저장 장소",
     login: "로그인",
     logout: "로그아웃",
     account: "계정",
@@ -43,6 +45,7 @@ const COPY = {
     working: "처리 중",
   },
   en: {
+    savedPlaces: "Saved places",
     login: "Sign in",
     logout: "Sign out",
     account: "Account",
@@ -67,9 +70,21 @@ const COPY = {
   },
 } as const;
 
-export default function AccountAccess({ language }: { language: Language }) {
+type AccountAccessProps = {
+  language: Language;
+  savedCount: number;
+  onOpenSavedPlaces: () => void;
+  onSessionChange: (user: AccountUser | null) => void;
+};
+
+export default function AccountAccess({
+  language,
+  savedCount,
+  onOpenSavedPlaces,
+  onSessionChange,
+}: AccountAccessProps) {
   const copy = COPY[language];
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AccountUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("login");
   const [recoveryAction, setRecoveryAction] =
@@ -85,8 +100,15 @@ export default function AccountAccess({ language }: { language: Language }) {
 
   useEffect(() => {
     backendApi<Session>("/auth/me")
-      .then((response) => setUser(response.data.authenticated ? response.data.user : null))
-      .catch(() => setUser(null));
+      .then((response) => {
+        const nextUser = response.data.authenticated ? response.data.user : null;
+        setUser(nextUser);
+        onSessionChange(nextUser);
+      })
+      .catch(() => {
+        setUser(null);
+        onSessionChange(null);
+      });
 
     const token = new URLSearchParams(window.location.search).get("resetToken");
     if (token) {
@@ -96,6 +118,19 @@ export default function AccountAccess({ language }: { language: Language }) {
         setIsOpen(true);
       });
     }
+  }, [onSessionChange]);
+
+  useEffect(() => {
+    const openLogin = () => {
+      setMode("login");
+      setMessage(null);
+      setError(null);
+      setPassword("");
+      setPasswordConfirm("");
+      setIsOpen(true);
+    };
+    window.addEventListener("kroute:open-login", openLogin);
+    return () => window.removeEventListener("kroute:open-login", openLogin);
   }, []);
 
   useEffect(() => {
@@ -127,18 +162,20 @@ export default function AccountAccess({ language }: { language: Language }) {
     setIsSubmitting(true);
     try {
       if (mode === "login") {
-        const response = await backendApi<User>("/auth/login", {
+        const response = await backendApi<AccountUser>("/auth/login", {
           method: "POST",
           body: JSON.stringify({ username, password }),
         });
         setUser(response.data);
+        onSessionChange(response.data);
         setIsOpen(false);
       } else if (mode === "signup") {
-        const response = await backendApi<User>("/auth/signup", {
+        const response = await backendApi<AccountUser>("/auth/signup", {
           method: "POST",
           body: JSON.stringify({ username, email, password }),
         });
         setUser(response.data);
+        onSessionChange(response.data);
         setIsOpen(false);
       } else if (mode === "recover") {
         const path =
@@ -172,6 +209,7 @@ export default function AccountAccess({ language }: { language: Language }) {
       await backendApi("/auth/logout", { method: "POST" });
     } finally {
       setUser(null);
+      onSessionChange(null);
     }
   }
 
@@ -182,6 +220,20 @@ export default function AccountAccess({ language }: { language: Language }) {
           <span className="max-w-24 truncate text-xs font-semibold text-[#344054]" title={user.email}>
             {user.username}
           </span>
+          <button
+            aria-label={`${copy.savedPlaces}: ${savedCount}`}
+            className="relative flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#475467] transition hover:border-[#2563eb] hover:text-[#2563eb]"
+            title={copy.savedPlaces}
+            type="button"
+            onClick={onOpenSavedPlaces}
+          >
+            <Bookmark aria-hidden="true" size={16} strokeWidth={2} />
+            {savedCount > 0 ? (
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2563eb] px-1 text-[10px] font-bold text-white">
+                {savedCount > 99 ? "99+" : savedCount}
+              </span>
+            ) : null}
+          </button>
           <button
             className="h-9 border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
             type="button"

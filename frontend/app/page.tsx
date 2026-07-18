@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import AccountAccess from "@/app/components/AccountAccess";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bookmark, BookmarkCheck, Trash2, X } from "lucide-react";
+import AccountAccess, { type AccountUser } from "@/app/components/AccountAccess";
+import { backendApi } from "@/app/lib/backend-api";
 
 type Area = {
   code: number;
@@ -37,6 +39,19 @@ type Place = {
   longitude: number;
   distanceMeters: number;
   imageUrl: string | null;
+};
+
+type SavedPlace = {
+  id: number;
+  contentId: string;
+  title: string;
+  category: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  imageUrl: string | null;
+  dataLanguage: string;
+  createdAt: string;
 };
 
 type PlaceDetail = {
@@ -720,6 +735,11 @@ const UI_MESSAGES = {
     resultsTitle: "검색 결과",
     emptyHint: "지도에서 지역을 선택하고 검색하세요.",
     emptyResults: "검색 후 관광지 결과가 여기에 표시됩니다.",
+    savedPlaces: "저장 장소",
+    savedEmpty: "저장한 장소가 없습니다. 검색 결과에서 북마크 버튼을 눌러 담아보세요.",
+    savePlace: "장소 저장",
+    removeSavedPlace: "저장 취소",
+    savedLoadError: "저장 장소를 처리하지 못했습니다.",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
     detailLoading: "상세 정보를 불러오는 중입니다.",
@@ -795,6 +815,11 @@ const UI_MESSAGES = {
     resultsTitle: "Nearby results",
     emptyHint: "Select an area on the map, then search.",
     emptyResults: "Nearby tourism results will appear here after search.",
+    savedPlaces: "Saved places",
+    savedEmpty: "No saved places yet. Use the bookmark button in search results to add one.",
+    savePlace: "Save place",
+    removeSavedPlace: "Remove saved place",
+    savedLoadError: "Saved places could not be updated.",
     fallbackCategory: "Spots",
     imageFallback: "No image",
     detailLoading: "Loading place details.",
@@ -875,6 +900,13 @@ export default function Home() {
   const [addressQuery, setAddressQuery] = useState("");
   const [contentType, setContentType] = useState(CONTENT_TYPES[0].value);
   const [places, setPlaces] = useState<Place[]>([]);
+  const [currentUser, setCurrentUser] = useState<AccountUser | null>(null);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [isSavedPlacesOpen, setIsSavedPlacesOpen] = useState(false);
+  const [savingContentIds, setSavingContentIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [savedPlacesError, setSavedPlacesError] = useState<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -904,6 +936,7 @@ export default function Home() {
   const selectedMarkerRef = useRef<KakaoMarker | null>(null);
   const placeMarkersRef = useRef<KakaoMarker[]>([]);
   const detailRequestIdRef = useRef(0);
+  const savedPlacesRequestIdRef = useRef(0);
 
   const apiBaseUrl = useMemo(() => {
     return "/backend-api";
@@ -921,6 +954,38 @@ export default function Home() {
   const areaPresets = useMemo(() => {
     return AREA_PRESETS.filter((preset) => preset.areaCode === selectedArea.code);
   }, [selectedArea.code]);
+
+  const savedPlaceByContentId = useMemo(() => {
+    return new Map(savedPlaces.map((place) => [place.contentId, place]));
+  }, [savedPlaces]);
+
+  const handleSessionChange = useCallback((user: AccountUser | null) => {
+    setCurrentUser(user);
+    setSavedPlacesError(null);
+    const requestId = savedPlacesRequestIdRef.current + 1;
+    savedPlacesRequestIdRef.current = requestId;
+
+    if (!user) {
+      setSavedPlaces([]);
+      setIsSavedPlacesOpen(false);
+      return;
+    }
+
+    backendApi<SavedPlace[]>("/saved-places")
+      .then((response) => {
+        if (savedPlacesRequestIdRef.current === requestId) {
+          setSavedPlaces(response.data);
+        }
+      })
+      .catch((error) => {
+        if (savedPlacesRequestIdRef.current === requestId) {
+          setSavedPlaces([]);
+          setSavedPlacesError(
+            error instanceof Error ? error.message : "Saved places could not be loaded",
+          );
+        }
+      });
+  }, []);
 
   const visitRows = placeDetail
     ? compactDetailRows([
@@ -1000,6 +1065,70 @@ export default function Home() {
     return ADDITIONAL_ATTRIBUTE_LABELS[key]?.[uiLanguage] ?? key;
   }
 
+  function toPlace(savedPlace: SavedPlace): Place {
+    return {
+      contentId: savedPlace.contentId,
+      title: savedPlace.title,
+      category: savedPlace.category,
+      address: savedPlace.address,
+      latitude: savedPlace.latitude,
+      longitude: savedPlace.longitude,
+      distanceMeters: 0,
+      imageUrl: savedPlace.imageUrl,
+    };
+  }
+
+  async function toggleSavedPlace(place: Place, detail?: PlaceDetail | null) {
+    if (!currentUser) {
+      window.dispatchEvent(new Event("kroute:open-login"));
+      return;
+    }
+
+    const existing = savedPlaceByContentId.get(place.contentId);
+    setSavedPlacesError(null);
+    setSavingContentIds((previous) => new Set(previous).add(place.contentId));
+
+    try {
+      if (existing) {
+        await backendApi(`/saved-places/${existing.id}`, { method: "DELETE" });
+        setSavedPlaces((previous) =>
+          previous.filter((savedPlace) => savedPlace.id !== existing.id),
+        );
+        return;
+      }
+
+      const response = await backendApi<SavedPlace>("/saved-places", {
+        method: "POST",
+        body: JSON.stringify({
+          contentId: place.contentId,
+          title: detail?.title || place.title,
+          category: place.category,
+          address: detail?.address ?? place.address ?? "",
+          latitude: detail?.latitude ?? place.latitude,
+          longitude: detail?.longitude ?? place.longitude,
+          imageUrl: detail?.primaryImageUrl ?? place.imageUrl,
+          dataLanguage: detail?.dataLanguage ?? language,
+        }),
+      });
+      setSavedPlaces((previous) => [
+        response.data,
+        ...previous.filter(
+          (savedPlace) => savedPlace.contentId !== response.data.contentId,
+        ),
+      ]);
+    } catch (error) {
+      setSavedPlacesError(
+        error instanceof Error ? error.message : messages.savedLoadError,
+      );
+    } finally {
+      setSavingContentIds((previous) => {
+        const next = new Set(previous);
+        next.delete(place.contentId);
+        return next;
+      });
+    }
+  }
+
   async function openPlaceDetail(place: Place) {
     const requestId = detailRequestIdRef.current + 1;
     detailRequestIdRef.current = requestId;
@@ -1008,6 +1137,7 @@ export default function Home() {
     setDetailErrorMessage(null);
     setIsDetailLoading(true);
     setFailedDetailImageUrls(new Set());
+    setIsSavedPlacesOpen(false);
 
     if (window.kakao?.maps && mapRef.current) {
       mapRef.current.setCenter(
@@ -1238,15 +1368,23 @@ export default function Home() {
   }, [places]);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
-      <div className="grid min-h-screen lg:h-full lg:min-h-0 lg:grid-cols-[390px_1fr]">
-        <aside className="relative z-20 flex flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
+    <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
+      <div className="grid min-h-screen min-w-0 w-full lg:h-full lg:min-h-0 lg:grid-cols-[390px_minmax(0,1fr)]">
+        <aside className="relative z-20 flex min-w-0 w-full flex-col border-r border-[#d4dce7] bg-white/90 px-4 py-4 shadow-[12px_0_40px_rgba(15,23,42,0.08)] backdrop-blur md:px-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
           <header className="border-b border-[#e1e7ef] pb-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2563eb]">
                 Global K-Route
               </p>
-              <AccountAccess language={uiLanguage} />
+              <AccountAccess
+                language={uiLanguage}
+                savedCount={savedPlaces.length}
+                onOpenSavedPlaces={() => {
+                  closePlaceDetail();
+                  setIsSavedPlacesOpen(true);
+                }}
+                onSessionChange={handleSessionChange}
+              />
             </div>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#101828]">
               {messages.heroTitle}
@@ -1469,6 +1607,12 @@ export default function Home() {
               </div>
             ) : null}
 
+            {savedPlacesError ? (
+              <div className="mt-4 border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]">
+                {savedPlacesError}
+              </div>
+            ) : null}
+
             <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1 lg:overflow-visible">
               {places.length === 0 && !errorMessage ? (
                 <div className="flex flex-1 items-center justify-center border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
@@ -1476,18 +1620,25 @@ export default function Home() {
                 </div>
               ) : null}
 
-              {places.map((place) => (
-                <button
-                  className={`w-full border bg-white p-3 text-left shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition ${
-                    selectedPlace?.contentId === place.contentId
-                      ? "border-[#2563eb] ring-2 ring-[#dbeafe]"
-                      : "border-[#e1e7ef] hover:border-[#98a2b3]"
-                  }`}
-                  key={place.contentId}
-                  type="button"
-                  onClick={() => openPlaceDetail(place)}
-                >
-                  <div className="flex gap-3">
+              {places.map((place) => {
+                const isSaved = savedPlaceByContentId.has(place.contentId);
+                const isSaving = savingContentIds.has(place.contentId);
+
+                return (
+                  <article
+                    className={`relative border bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition ${
+                      selectedPlace?.contentId === place.contentId
+                        ? "border-[#2563eb] ring-2 ring-[#dbeafe]"
+                        : "border-[#e1e7ef] hover:border-[#98a2b3]"
+                    }`}
+                    key={place.contentId}
+                  >
+                    <button
+                      className="w-full p-3 pr-12 text-left"
+                      type="button"
+                      onClick={() => openPlaceDetail(place)}
+                    >
+                      <div className="flex gap-3">
                     {place.imageUrl && !failedImageIds.has(place.contentId) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -1513,7 +1664,7 @@ export default function Home() {
                         </span>
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="truncate text-sm font-semibold text-[#101828]">
                           {place.title}
@@ -1528,15 +1679,35 @@ export default function Home() {
                       <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
                         {getCategoryLabel(place.category)}
                       </p>
-                    </div>
-                  </div>
-                </button>
-              ))}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      aria-label={isSaved ? messages.removeSavedPlace : messages.savePlace}
+                      className={`absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center border bg-white transition disabled:cursor-wait disabled:opacity-50 ${
+                        isSaved
+                          ? "border-[#2563eb] text-[#2563eb]"
+                          : "border-[#d0d5dd] text-[#667085] hover:border-[#2563eb] hover:text-[#2563eb]"
+                      }`}
+                      disabled={isSaving}
+                      title={isSaved ? messages.removeSavedPlace : messages.savePlace}
+                      type="button"
+                      onClick={() => toggleSavedPlace(place)}
+                    >
+                      {isSaved ? (
+                        <BookmarkCheck aria-hidden="true" size={18} />
+                      ) : (
+                        <Bookmark aria-hidden="true" size={18} />
+                      )}
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </section>
         </aside>
 
-        <section className="relative min-h-[720px] overflow-hidden bg-[#dfe8ef] lg:h-full lg:min-h-0">
+          <section className="relative min-h-[720px] min-w-0 w-full overflow-hidden bg-[#dfe8ef] lg:h-full lg:min-h-0">
           <div ref={mapContainerRef} className="absolute inset-0 z-0" />
           <div
             className={`absolute inset-0 bg-[linear-gradient(#cfdbe5_1px,transparent_1px),linear-gradient(90deg,#cfdbe5_1px,transparent_1px)] bg-[size:56px_56px] ${
@@ -1629,6 +1800,95 @@ export default function Home() {
             </div>
           </div>
 
+          {isSavedPlacesOpen ? (
+            <aside className="absolute inset-3 z-30 overflow-y-auto border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[420px]">
+              <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[#e1e7ef] bg-white/96 p-4 backdrop-blur">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
+                    Global K-Route
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-[#101828]">
+                    {messages.savedPlaces}
+                    <span className="ml-2 text-sm font-medium text-[#667085]">
+                      {savedPlaces.length}
+                    </span>
+                  </h2>
+                </div>
+                <button
+                  aria-label={messages.closeDetail}
+                  className="flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#475467] transition hover:bg-[#f2f4f7]"
+                  title={messages.closeDetail}
+                  type="button"
+                  onClick={() => setIsSavedPlacesOpen(false)}
+                >
+                  <X aria-hidden="true" size={18} />
+                </button>
+              </header>
+
+              {savedPlacesError ? (
+                <div className="m-4 border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]">
+                  {savedPlacesError}
+                </div>
+              ) : null}
+
+              {savedPlaces.length === 0 ? (
+                <div className="m-4 border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-8 text-center text-sm leading-6 text-[#667085]">
+                  {messages.savedEmpty}
+                </div>
+              ) : (
+                <div className="space-y-3 p-4">
+                  {savedPlaces.map((savedPlace) => (
+                    <article
+                      className="relative border border-[#e1e7ef] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
+                      key={savedPlace.id}
+                    >
+                      <button
+                        className="flex w-full gap-3 p-3 pr-12 text-left"
+                        type="button"
+                        onClick={() => openPlaceDetail(toPlace(savedPlace))}
+                      >
+                        {savedPlace.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            alt={savedPlace.title}
+                            className="h-20 w-20 shrink-0 object-cover"
+                            loading="lazy"
+                            src={savedPlace.imageUrl}
+                          />
+                        ) : (
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center bg-[#edf3f8] px-2 text-center text-xs font-semibold text-[#667085]">
+                            {getCategoryLabel(savedPlace.category)}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-sm font-semibold text-[#101828]">
+                            {savedPlace.title}
+                          </h3>
+                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#667085]">
+                            {savedPlace.address}
+                          </p>
+                          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#2563eb]">
+                            {getCategoryLabel(savedPlace.category)} · {savedPlace.dataLanguage.toUpperCase()}
+                          </p>
+                        </div>
+                      </button>
+                      <button
+                        aria-label={messages.removeSavedPlace}
+                        className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#667085] transition hover:border-[#dc2626] hover:text-[#dc2626] disabled:cursor-wait disabled:opacity-50"
+                        disabled={savingContentIds.has(savedPlace.contentId)}
+                        title={messages.removeSavedPlace}
+                        type="button"
+                        onClick={() => toggleSavedPlace(toPlace(savedPlace))}
+                      >
+                        <Trash2 aria-hidden="true" size={17} />
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </aside>
+          ) : null}
+
           {selectedPlace ? (
             <aside className="absolute inset-3 z-30 overflow-y-auto border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[460px]">
               <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e1e7ef] bg-white/96 p-4 backdrop-blur">
@@ -1640,15 +1900,43 @@ export default function Home() {
                     {placeDetail?.title || selectedPlace.title}
                   </h2>
                 </div>
-                <button
-                  aria-label={messages.closeDetail}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d0d5dd] bg-white text-xl text-[#475467] transition hover:bg-[#f2f4f7]"
-                  title={messages.closeDetail}
-                  type="button"
-                  onClick={closePlaceDetail}
-                >
-                  ×
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    aria-label={
+                      savedPlaceByContentId.has(selectedPlace.contentId)
+                        ? messages.removeSavedPlace
+                        : messages.savePlace
+                    }
+                    className={`flex h-9 w-9 items-center justify-center border bg-white transition disabled:cursor-wait disabled:opacity-50 ${
+                      savedPlaceByContentId.has(selectedPlace.contentId)
+                        ? "border-[#2563eb] text-[#2563eb]"
+                        : "border-[#d0d5dd] text-[#667085] hover:border-[#2563eb] hover:text-[#2563eb]"
+                    }`}
+                    disabled={savingContentIds.has(selectedPlace.contentId)}
+                    title={
+                      savedPlaceByContentId.has(selectedPlace.contentId)
+                        ? messages.removeSavedPlace
+                        : messages.savePlace
+                    }
+                    type="button"
+                    onClick={() => toggleSavedPlace(selectedPlace, placeDetail)}
+                  >
+                    {savedPlaceByContentId.has(selectedPlace.contentId) ? (
+                      <BookmarkCheck aria-hidden="true" size={18} />
+                    ) : (
+                      <Bookmark aria-hidden="true" size={18} />
+                    )}
+                  </button>
+                  <button
+                    aria-label={messages.closeDetail}
+                    className="flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#475467] transition hover:bg-[#f2f4f7]"
+                    title={messages.closeDetail}
+                    type="button"
+                    onClick={closePlaceDetail}
+                  >
+                    <X aria-hidden="true" size={18} />
+                  </button>
+                </div>
               </header>
 
               {isDetailLoading ? (
