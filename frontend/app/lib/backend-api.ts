@@ -9,19 +9,14 @@ type CsrfResponse = {
   headerName: string;
 };
 
-let csrfToken: CsrfResponse | null = null;
-
-async function loadCsrf(force = false) {
-  if (!csrfToken || force) {
-    const response = await fetch("/backend-api/api/auth/csrf", {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-    if (!response.ok) throw new Error("Security token could not be loaded");
-    const envelope = (await response.json()) as ApiEnvelope<CsrfResponse>;
-    csrfToken = envelope.data;
-  }
-  return csrfToken;
+async function loadCsrf() {
+  const response = await fetch("/backend-api/api/auth/csrf", {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Security token could not be loaded");
+  const envelope = (await response.json()) as ApiEnvelope<CsrfResponse>;
+  return envelope.data;
 }
 
 export async function backendApi<T>(
@@ -48,7 +43,7 @@ export async function backendApi<T>(
   });
 
   if (isMutation && response.status === 403) {
-    const csrf = await loadCsrf(true);
+    const csrf = await loadCsrf();
     headers.set(csrf.headerName, csrf.token);
     response = await fetch(`/backend-api/api${path}`, {
       ...options,
