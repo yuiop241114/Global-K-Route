@@ -1,8 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, BookmarkCheck, Trash2, X } from "lucide-react";
+import {
+  Bookmark,
+  BookmarkCheck,
+  Route as RouteIcon,
+  Trash2,
+  X,
+} from "lucide-react";
 import AccountAccess, { type AccountUser } from "@/app/components/AccountAccess";
+import RoutePlannerPanel, {
+  type RouteDraftPlace,
+  type TravelRoute,
+} from "@/app/components/RoutePlannerPanel";
 import { backendApi } from "@/app/lib/backend-api";
 
 type Area = {
@@ -124,11 +134,24 @@ type KakaoLatLng = {
 type KakaoMap = {
   setCenter: (latLng: KakaoLatLng) => void;
   setLevel: (level: number) => void;
+  setBounds: (bounds: KakaoLatLngBounds) => void;
 };
 
 type KakaoMarker = {
   setMap: (map: KakaoMap | null) => void;
   setPosition: (latLng: KakaoLatLng) => void;
+};
+
+type KakaoCustomOverlay = {
+  setMap: (map: KakaoMap | null) => void;
+};
+
+type KakaoPolyline = {
+  setMap: (map: KakaoMap | null) => void;
+};
+
+type KakaoLatLngBounds = {
+  extend: (latLng: KakaoLatLng) => void;
 };
 
 type KakaoGeocoderResult = {
@@ -145,6 +168,23 @@ type KakaoMapsApi = {
     options: { center: KakaoLatLng; level: number },
   ) => KakaoMap;
   Marker: new (options: { map?: KakaoMap; position: KakaoLatLng }) => KakaoMarker;
+  CustomOverlay: new (options: {
+    map?: KakaoMap;
+    position: KakaoLatLng;
+    content: HTMLElement;
+    xAnchor?: number;
+    yAnchor?: number;
+    zIndex?: number;
+  }) => KakaoCustomOverlay;
+  Polyline: new (options: {
+    map?: KakaoMap;
+    path: KakaoLatLng[];
+    strokeWeight: number;
+    strokeColor: string;
+    strokeOpacity: number;
+    strokeStyle: string;
+  }) => KakaoPolyline;
+  LatLngBounds: new () => KakaoLatLngBounds;
   services: {
     Status: {
       OK: string;
@@ -158,7 +198,7 @@ type KakaoMapsApi = {
   };
   event: {
     addListener: (
-      target: KakaoMap,
+      target: KakaoMap | KakaoMarker,
       type: "click",
       callback: (event: { latLng: KakaoLatLng }) => void,
     ) => void;
@@ -740,6 +780,14 @@ const UI_MESSAGES = {
     savePlace: "장소 저장",
     removeSavedPlace: "저장 취소",
     savedLoadError: "저장 장소를 처리하지 못했습니다.",
+    routePlanner: "코스 편집",
+    addToRoute: "코스에 추가",
+    removeFromRoute: "코스에서 제거",
+    routePlaceLimit: "한 코스에는 장소를 최대 30개까지 추가할 수 있습니다.",
+    routeDuplicate: "이미 현재 코스에 포함된 장소입니다.",
+    routeSaveError: "코스를 처리하지 못했습니다.",
+    routeSignIn: "로그인하면 현재 코스를 영구 저장합니다.",
+    defaultRouteTitle: "나의 한국 여행",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
     detailLoading: "상세 정보를 불러오는 중입니다.",
@@ -820,6 +868,14 @@ const UI_MESSAGES = {
     savePlace: "Save place",
     removeSavedPlace: "Remove saved place",
     savedLoadError: "Saved places could not be updated.",
+    routePlanner: "Route planner",
+    addToRoute: "Add to route",
+    removeFromRoute: "Remove from route",
+    routePlaceLimit: "A route can contain up to 30 places.",
+    routeDuplicate: "This place is already in the current route.",
+    routeSaveError: "The route could not be updated.",
+    routeSignIn: "Sign in to save the current route permanently.",
+    defaultRouteTitle: "My Korea route",
     fallbackCategory: "Spots",
     imageFallback: "No image",
     detailLoading: "Loading place details.",
@@ -887,6 +943,23 @@ function isExternalUrl(value: string | null | undefined): value is string {
   return Boolean(value && /^https?:\/\//i.test(value));
 }
 
+const ROUTE_DRAFT_STORAGE_KEY = "kroute.route-draft.v1";
+const MAX_ROUTE_PLACES = 30;
+
+function isRouteDraftPlace(value: unknown): value is RouteDraftPlace {
+  if (!value || typeof value !== "object") return false;
+  const place = value as Partial<RouteDraftPlace>;
+  return (
+    typeof place.contentId === "string" &&
+    typeof place.title === "string" &&
+    typeof place.category === "string" &&
+    typeof place.address === "string" &&
+    typeof place.latitude === "number" &&
+    typeof place.longitude === "number" &&
+    typeof place.dataLanguage === "string"
+  );
+}
+
 export default function Home() {
   const [selectedArea, setSelectedArea] = useState<Area>(AREAS[0]);
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint>({
@@ -907,6 +980,15 @@ export default function Home() {
     () => new Set(),
   );
   const [savedPlacesError, setSavedPlacesError] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<TravelRoute[]>([]);
+  const [activeRouteId, setActiveRouteId] = useState<number | null>(null);
+  const [routeDraftTitle, setRouteDraftTitle] = useState("나의 한국 여행");
+  const [routeDraftPlaces, setRouteDraftPlaces] = useState<RouteDraftPlace[]>([]);
+  const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState(false);
+  const [isRouteSaving, setIsRouteSaving] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [saveRouteAfterLogin, setSaveRouteAfterLogin] = useState(false);
+  const [isRouteDraftHydrated, setIsRouteDraftHydrated] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [placeDetail, setPlaceDetail] = useState<PlaceDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -935,8 +1017,12 @@ export default function Home() {
   const mapRef = useRef<KakaoMap | null>(null);
   const selectedMarkerRef = useRef<KakaoMarker | null>(null);
   const placeMarkersRef = useRef<KakaoMarker[]>([]);
+  const routeMarkersRef = useRef<KakaoCustomOverlay[]>([]);
+  const routePolylineRef = useRef<KakaoPolyline | null>(null);
+  const openPlaceDetailRef = useRef<(place: Place) => void>(() => undefined);
   const detailRequestIdRef = useRef(0);
   const savedPlacesRequestIdRef = useRef(0);
+  const routesRequestIdRef = useRef(0);
 
   const apiBaseUrl = useMemo(() => {
     return "/backend-api";
@@ -959,14 +1045,22 @@ export default function Home() {
     return new Map(savedPlaces.map((place) => [place.contentId, place]));
   }, [savedPlaces]);
 
+  const routeContentIds = useMemo(
+    () => new Set(routeDraftPlaces.map((place) => place.contentId)),
+    [routeDraftPlaces],
+  );
+
   const handleSessionChange = useCallback((user: AccountUser | null) => {
     setCurrentUser(user);
     setSavedPlacesError(null);
     const requestId = savedPlacesRequestIdRef.current + 1;
+    const routeRequestId = routesRequestIdRef.current + 1;
     savedPlacesRequestIdRef.current = requestId;
+    routesRequestIdRef.current = routeRequestId;
 
     if (!user) {
       setSavedPlaces([]);
+      setRoutes([]);
       setIsSavedPlacesOpen(false);
       return;
     }
@@ -985,7 +1079,101 @@ export default function Home() {
           );
         }
       });
+
+    backendApi<TravelRoute[]>("/routes")
+      .then((response) => {
+        if (routesRequestIdRef.current === routeRequestId) {
+          setRoutes(response.data);
+        }
+      })
+      .catch((error) => {
+        if (routesRequestIdRef.current === routeRequestId) {
+          setRoutes([]);
+          setRouteError(
+            error instanceof Error ? error.message : "Routes could not be loaded",
+          );
+        }
+      });
   }, []);
+
+  useEffect(() => {
+    const hydrationTimer = window.setTimeout(() => {
+      try {
+        const stored = window.localStorage.getItem(ROUTE_DRAFT_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as {
+            title?: unknown;
+            places?: unknown;
+          };
+          if (typeof parsed.title === "string" && parsed.title.trim()) {
+            setRouteDraftTitle(parsed.title.slice(0, 100));
+          }
+          if (Array.isArray(parsed.places)) {
+            setRouteDraftPlaces(
+              parsed.places.filter(isRouteDraftPlace).slice(0, MAX_ROUTE_PLACES),
+            );
+          }
+        }
+      } catch {
+        window.localStorage.removeItem(ROUTE_DRAFT_STORAGE_KEY);
+      } finally {
+        setIsRouteDraftHydrated(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(hydrationTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!isRouteDraftHydrated) return;
+    window.localStorage.setItem(
+      ROUTE_DRAFT_STORAGE_KEY,
+      JSON.stringify({ title: routeDraftTitle, places: routeDraftPlaces }),
+    );
+  }, [isRouteDraftHydrated, routeDraftPlaces, routeDraftTitle]);
+
+  const persistRoute = useCallback(
+    async () => {
+      if (!routeDraftTitle.trim() || routeDraftPlaces.length === 0) return;
+      setIsRouteSaving(true);
+      setRouteError(null);
+      try {
+        const path = activeRouteId ? `/routes/${activeRouteId}` : "/routes";
+        const response = await backendApi<TravelRoute>(path, {
+          method: activeRouteId ? "PUT" : "POST",
+          body: JSON.stringify({
+            title: routeDraftTitle.trim(),
+            places: routeDraftPlaces,
+          }),
+        });
+        setActiveRouteId(response.data.id);
+        setRoutes((previous) => [
+          response.data,
+          ...previous.filter((route) => route.id !== response.data.id),
+        ]);
+      } catch (error) {
+        setRouteError(
+          error instanceof Error
+            ? error.message
+            : uiLanguage === "ko"
+              ? "코스를 처리하지 못했습니다."
+              : "The route could not be updated.",
+        );
+      } finally {
+        setIsRouteSaving(false);
+      }
+    },
+    [activeRouteId, routeDraftPlaces, routeDraftTitle, uiLanguage],
+  );
+
+  useEffect(() => {
+    if (!currentUser || !saveRouteAfterLogin) return;
+    const saveTimer = window.setTimeout(() => {
+      setSaveRouteAfterLogin(false);
+      void persistRoute();
+    }, 0);
+    return () => window.clearTimeout(saveTimer);
+  }, [currentUser, persistRoute, saveRouteAfterLogin]);
 
   const visitRows = placeDetail
     ? compactDetailRows([
@@ -1078,6 +1266,116 @@ export default function Home() {
     };
   }
 
+  function toRouteDraftPlace(
+    place: Place,
+    detail?: PlaceDetail | null,
+  ): RouteDraftPlace {
+    return {
+      contentId: place.contentId,
+      title: detail?.title || place.title,
+      category: place.category,
+      address: detail?.address ?? place.address ?? "",
+      latitude: detail?.latitude ?? place.latitude,
+      longitude: detail?.longitude ?? place.longitude,
+      imageUrl: detail?.primaryImageUrl ?? place.imageUrl,
+      dataLanguage: detail?.dataLanguage ?? language,
+      stayMinutes: null,
+    };
+  }
+
+  function toggleRoutePlace(place: Place, detail?: PlaceDetail | null) {
+    if (routeContentIds.has(place.contentId)) {
+      setRouteDraftPlaces((previous) =>
+        previous.filter((item) => item.contentId !== place.contentId),
+      );
+      setRouteError(null);
+      return;
+    }
+    if (routeDraftPlaces.length >= MAX_ROUTE_PLACES) {
+      setRouteError(messages.routePlaceLimit);
+      setIsRoutePlannerOpen(true);
+      return;
+    }
+    setRouteDraftPlaces((previous) => [
+      ...previous,
+      toRouteDraftPlace(place, detail),
+    ]);
+    setRouteError(null);
+    setIsSavedPlacesOpen(false);
+    closePlaceDetail();
+    setIsRoutePlannerOpen(true);
+  }
+
+  function moveRoutePlace(index: number, direction: -1 | 1) {
+    setRouteDraftPlaces((previous) => {
+      const target = index + direction;
+      if (target < 0 || target >= previous.length) return previous;
+      const next = [...previous];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function startNewRoute() {
+    setActiveRouteId(null);
+    setRouteDraftTitle(messages.defaultRouteTitle);
+    setRouteDraftPlaces([]);
+    setRouteError(null);
+  }
+
+  function openRoute(route: TravelRoute) {
+    setActiveRouteId(route.id);
+    setRouteDraftTitle(route.title);
+    setRouteDraftPlaces(
+      [...route.places]
+        .sort((left, right) => left.visitOrder - right.visitOrder)
+        .map((place) => ({
+          contentId: place.contentId,
+          title: place.title,
+          category: place.category,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          imageUrl: place.imageUrl,
+          dataLanguage: place.dataLanguage,
+          stayMinutes: place.stayMinutes,
+        })),
+    );
+    setRouteError(null);
+    setIsSavedPlacesOpen(false);
+    closePlaceDetail();
+    setIsRoutePlannerOpen(true);
+  }
+
+  function requestRouteSave() {
+    if (!currentUser) {
+      setSaveRouteAfterLogin(true);
+      setRouteError(messages.routeSignIn);
+      window.dispatchEvent(new Event("kroute:open-login"));
+      return;
+    }
+    void persistRoute();
+  }
+
+  async function deleteRoute(routeId: number) {
+    const confirmed = window.confirm(
+      uiLanguage === "ko"
+        ? "이 코스를 삭제하시겠습니까?"
+        : "Delete this route?",
+    );
+    if (!confirmed) return;
+    setRouteError(null);
+    try {
+      await backendApi(`/routes/${routeId}`, { method: "DELETE" });
+      setRoutes((previous) => previous.filter((route) => route.id !== routeId));
+      if (activeRouteId === routeId) startNewRoute();
+    } catch (error) {
+      setRouteError(
+        error instanceof Error ? error.message : messages.routeSaveError,
+      );
+    }
+  }
+
   async function toggleSavedPlace(place: Place, detail?: PlaceDetail | null) {
     if (!currentUser) {
       window.dispatchEvent(new Event("kroute:open-login"));
@@ -1138,6 +1436,7 @@ export default function Home() {
     setIsDetailLoading(true);
     setFailedDetailImageUrls(new Set());
     setIsSavedPlacesOpen(false);
+    setIsRoutePlannerOpen(false);
 
     if (window.kakao?.maps && mapRef.current) {
       mapRef.current.setCenter(
@@ -1360,12 +1659,105 @@ export default function Home() {
 
     placeMarkersRef.current.forEach((marker) => marker.setMap(null));
     placeMarkersRef.current = places.map((place) => {
-      return new window.kakao!.maps.Marker({
+      const marker = new window.kakao!.maps.Marker({
         map: mapRef.current ?? undefined,
         position: new window.kakao!.maps.LatLng(place.latitude, place.longitude),
       });
+      window.kakao!.maps.event.addListener(marker, "click", () => {
+        openPlaceDetailRef.current(place);
+      });
+      return marker;
     });
   }, [places]);
+
+  useEffect(() => {
+    openPlaceDetailRef.current = openPlaceDetail;
+  });
+
+  useEffect(() => {
+    if (!window.kakao?.maps || !mapRef.current || mapStatus !== "ready") {
+      return;
+    }
+
+    routeMarkersRef.current.forEach((marker) => marker.setMap(null));
+    routeMarkersRef.current = [];
+    routePolylineRef.current?.setMap(null);
+    routePolylineRef.current = null;
+
+    if (routeDraftPlaces.length === 0) return;
+
+    const kakaoMaps = window.kakao.maps;
+    const map = mapRef.current;
+    const path = routeDraftPlaces.map(
+      (place) => new kakaoMaps.LatLng(place.latitude, place.longitude),
+    );
+
+    routeMarkersRef.current = path.map((position, index) => {
+      const badge = document.createElement("button");
+      badge.type = "button";
+      badge.textContent = String(index + 1);
+      badge.title = routeDraftPlaces[index].title;
+      badge.setAttribute(
+        "aria-label",
+        `${index + 1}. ${routeDraftPlaces[index].title}`,
+      );
+      Object.assign(badge.style, {
+        alignItems: "center",
+        background: "#0f766e",
+        border: "3px solid #ffffff",
+        borderRadius: "50%",
+        boxShadow: "0 8px 20px rgba(15, 23, 42, 0.28)",
+        color: "#ffffff",
+        cursor: "pointer",
+        display: "flex",
+        fontSize: "13px",
+        fontWeight: "700",
+        height: "34px",
+        justifyContent: "center",
+        letterSpacing: "0",
+        width: "34px",
+      });
+      badge.addEventListener("click", () => {
+        const routePlace = routeDraftPlaces[index];
+        openPlaceDetailRef.current({
+          contentId: routePlace.contentId,
+          title: routePlace.title,
+          category: routePlace.category,
+          address: routePlace.address,
+          latitude: routePlace.latitude,
+          longitude: routePlace.longitude,
+          distanceMeters: 0,
+          imageUrl: routePlace.imageUrl,
+        });
+      });
+
+      return new kakaoMaps.CustomOverlay({
+        map,
+        position,
+        content: badge,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: 20,
+      });
+    });
+
+    if (path.length > 1) {
+      routePolylineRef.current = new kakaoMaps.Polyline({
+        map,
+        path,
+        strokeWeight: 5,
+        strokeColor: "#0f766e",
+        strokeOpacity: 0.82,
+        strokeStyle: "solid",
+      });
+      const bounds = new kakaoMaps.LatLngBounds();
+      path.forEach((position) => bounds.extend(position));
+      map.setBounds(bounds);
+    } else {
+      map.setCenter(path[0]);
+      map.setLevel(5);
+    }
+  }, [mapStatus, routeDraftPlaces]);
 
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
@@ -1623,6 +2015,7 @@ export default function Home() {
               {places.map((place) => {
                 const isSaved = savedPlaceByContentId.has(place.contentId);
                 const isSaving = savingContentIds.has(place.contentId);
+                const isInRoute = routeContentIds.has(place.contentId);
 
                 return (
                   <article
@@ -1634,7 +2027,7 @@ export default function Home() {
                     key={place.contentId}
                   >
                     <button
-                      className="w-full p-3 pr-12 text-left"
+                      className="w-full p-3 pr-24 text-left"
                       type="button"
                       onClick={() => openPlaceDetail(place)}
                     >
@@ -1681,6 +2074,27 @@ export default function Home() {
                       </p>
                         </div>
                       </div>
+                    </button>
+                    <button
+                      aria-label={
+                        isInRoute
+                          ? messages.removeFromRoute
+                          : messages.addToRoute
+                      }
+                      className={`absolute bottom-3 right-14 flex h-9 w-9 items-center justify-center border bg-white transition ${
+                        isInRoute
+                          ? "border-[#0f766e] bg-[#f0fdfa] text-[#0f766e]"
+                          : "border-[#d0d5dd] text-[#667085] hover:border-[#0f766e] hover:text-[#0f766e]"
+                      }`}
+                      title={
+                        isInRoute
+                          ? messages.removeFromRoute
+                          : messages.addToRoute
+                      }
+                      type="button"
+                      onClick={() => toggleRoutePlace(place)}
+                    >
+                      <RouteIcon aria-hidden="true" size={18} />
                     </button>
                     <button
                       aria-label={isSaved ? messages.removeSavedPlace : messages.savePlace}
@@ -1783,6 +2197,32 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <button
+                className={`flex h-10 items-center gap-2 border px-3 text-sm font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition ${
+                  isRoutePlannerOpen
+                    ? "border-[#0f766e] bg-[#0f766e] text-white"
+                    : "border-white/80 bg-white/88 text-[#0f766e] hover:bg-white"
+                }`}
+                title={messages.routePlanner}
+                type="button"
+                onClick={() => {
+                  closePlaceDetail();
+                  setIsSavedPlacesOpen(false);
+                  setIsRoutePlannerOpen(true);
+                }}
+              >
+                <RouteIcon aria-hidden="true" size={17} />
+                <span>{messages.routePlanner}</span>
+                <span
+                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${
+                    isRoutePlannerOpen
+                      ? "bg-white text-[#0f766e]"
+                      : "bg-[#0f766e] text-white"
+                  }`}
+                >
+                  {routeDraftPlaces.length}
+                </span>
+              </button>
               {AREAS.map((area) => (
                 <button
                   className={`h-10 border px-3 text-sm font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition ${
@@ -1799,6 +2239,32 @@ export default function Home() {
               ))}
             </div>
           </div>
+
+          {isRoutePlannerOpen ? (
+            <RoutePlannerPanel
+              activeRouteId={activeRouteId}
+              error={routeError}
+              isAuthenticated={currentUser !== null}
+              isSaving={isRouteSaving}
+              language={uiLanguage}
+              places={routeDraftPlaces}
+              routes={routes}
+              title={routeDraftTitle}
+              onClose={() => setIsRoutePlannerOpen(false)}
+              onDeleteRoute={(routeId) => void deleteRoute(routeId)}
+              onMovePlace={moveRoutePlace}
+              onNewRoute={startNewRoute}
+              onOpenRoute={openRoute}
+              onRemovePlace={(contentId) => {
+                setRouteDraftPlaces((previous) =>
+                  previous.filter((place) => place.contentId !== contentId),
+                );
+                setRouteError(null);
+              }}
+              onSaveRoute={requestRouteSave}
+              onTitleChange={setRouteDraftTitle}
+            />
+          ) : null}
 
           {isSavedPlacesOpen ? (
             <aside className="absolute inset-3 z-30 overflow-y-auto border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[420px]">
@@ -1837,13 +2303,15 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="space-y-3 p-4">
-                  {savedPlaces.map((savedPlace) => (
+                  {savedPlaces.map((savedPlace) => {
+                    const isInRoute = routeContentIds.has(savedPlace.contentId);
+                    return (
                     <article
                       className="relative border border-[#e1e7ef] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
                       key={savedPlace.id}
                     >
                       <button
-                        className="flex w-full gap-3 p-3 pr-12 text-left"
+                        className="flex w-full gap-3 p-3 pr-24 text-left"
                         type="button"
                         onClick={() => openPlaceDetail(toPlace(savedPlace))}
                       >
@@ -1873,6 +2341,27 @@ export default function Home() {
                         </div>
                       </button>
                       <button
+                        aria-label={
+                          isInRoute
+                            ? messages.removeFromRoute
+                            : messages.addToRoute
+                        }
+                        className={`absolute bottom-3 right-14 flex h-9 w-9 items-center justify-center border bg-white transition ${
+                          isInRoute
+                            ? "border-[#0f766e] bg-[#f0fdfa] text-[#0f766e]"
+                            : "border-[#d0d5dd] text-[#667085] hover:border-[#0f766e] hover:text-[#0f766e]"
+                        }`}
+                        title={
+                          isInRoute
+                            ? messages.removeFromRoute
+                            : messages.addToRoute
+                        }
+                        type="button"
+                        onClick={() => toggleRoutePlace(toPlace(savedPlace))}
+                      >
+                        <RouteIcon aria-hidden="true" size={17} />
+                      </button>
+                      <button
                         aria-label={messages.removeSavedPlace}
                         className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#667085] transition hover:border-[#dc2626] hover:text-[#dc2626] disabled:cursor-wait disabled:opacity-50"
                         disabled={savingContentIds.has(savedPlace.contentId)}
@@ -1883,7 +2372,8 @@ export default function Home() {
                         <Trash2 aria-hidden="true" size={17} />
                       </button>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </aside>
@@ -1901,6 +2391,27 @@ export default function Home() {
                   </h2>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  <button
+                    aria-label={
+                      routeContentIds.has(selectedPlace.contentId)
+                        ? messages.removeFromRoute
+                        : messages.addToRoute
+                    }
+                    className={`flex h-9 w-9 items-center justify-center border bg-white transition ${
+                      routeContentIds.has(selectedPlace.contentId)
+                        ? "border-[#0f766e] bg-[#f0fdfa] text-[#0f766e]"
+                        : "border-[#d0d5dd] text-[#667085] hover:border-[#0f766e] hover:text-[#0f766e]"
+                    }`}
+                    title={
+                      routeContentIds.has(selectedPlace.contentId)
+                        ? messages.removeFromRoute
+                        : messages.addToRoute
+                    }
+                    type="button"
+                    onClick={() => toggleRoutePlace(selectedPlace, placeDetail)}
+                  >
+                    <RouteIcon aria-hidden="true" size={18} />
+                  </button>
                   <button
                     aria-label={
                       savedPlaceByContentId.has(selectedPlace.contentId)

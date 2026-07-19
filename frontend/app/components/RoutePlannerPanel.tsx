@@ -1,0 +1,301 @@
+"use client";
+
+import {
+  ArrowDown,
+  ArrowUp,
+  Plus,
+  Route as RouteIcon,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
+
+export type RouteDraftPlace = {
+  contentId: string;
+  title: string;
+  category: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  imageUrl: string | null;
+  dataLanguage: string;
+  stayMinutes: number | null;
+};
+
+export type TravelRoute = {
+  id: number;
+  title: string;
+  places: Array<RouteDraftPlace & { id: number; visitOrder: number }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RoutePlannerPanelProps = {
+  language: "ko" | "en";
+  isAuthenticated: boolean;
+  routes: TravelRoute[];
+  activeRouteId: number | null;
+  title: string;
+  places: RouteDraftPlace[];
+  error: string | null;
+  isSaving: boolean;
+  onClose: () => void;
+  onTitleChange: (title: string) => void;
+  onMovePlace: (index: number, direction: -1 | 1) => void;
+  onRemovePlace: (contentId: string) => void;
+  onOpenRoute: (route: TravelRoute) => void;
+  onNewRoute: () => void;
+  onSaveRoute: () => void;
+  onDeleteRoute: (routeId: number) => void;
+};
+
+const COPY = {
+  ko: {
+    planner: "코스 편집",
+    draft: "현재 코스",
+    savedRoutes: "저장된 코스",
+    routeTitle: "코스 이름",
+    routeTitlePlaceholder: "예: 서울 하루 여행",
+    empty: "검색 결과나 상세 정보에서 코스 추가 버튼을 눌러 장소를 담아보세요.",
+    guest: "코스 초안은 이 브라우저에 임시 저장됩니다. 영구 저장할 때 로그인이 필요합니다.",
+    newRoute: "새 코스",
+    saveRoute: "코스 저장",
+    signInToSave: "로그인 후 저장",
+    deleteRoute: "코스 삭제",
+    openRoute: "코스 열기",
+    removePlace: "코스에서 제거",
+    moveUp: "위로 이동",
+    moveDown: "아래로 이동",
+    stop: "번째 장소",
+    places: "개 장소",
+  },
+  en: {
+    planner: "Route planner",
+    draft: "Current route",
+    savedRoutes: "Saved routes",
+    routeTitle: "Route name",
+    routeTitlePlaceholder: "e.g. One day in Seoul",
+    empty: "Add places from search results or place details to start a route.",
+    guest: "This draft stays in this browser. Sign in when you want to save it permanently.",
+    newRoute: "New route",
+    saveRoute: "Save route",
+    signInToSave: "Sign in to save",
+    deleteRoute: "Delete route",
+    openRoute: "Open route",
+    removePlace: "Remove from route",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    stop: "stop",
+    places: "places",
+  },
+} as const;
+
+export default function RoutePlannerPanel({
+  language,
+  isAuthenticated,
+  routes,
+  activeRouteId,
+  title,
+  places,
+  error,
+  isSaving,
+  onClose,
+  onTitleChange,
+  onMovePlace,
+  onRemovePlace,
+  onOpenRoute,
+  onNewRoute,
+  onSaveRoute,
+  onDeleteRoute,
+}: RoutePlannerPanelProps) {
+  const copy = COPY[language];
+
+  return (
+    <aside className="absolute inset-3 z-40 flex flex-col overflow-hidden border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[440px]">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[#e1e7ef] bg-white/96 p-4">
+        <div>
+          <p className="text-xs font-semibold uppercase text-[#0f766e]">
+            Global K-Route
+          </p>
+          <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[#101828]">
+            <RouteIcon aria-hidden="true" size={20} />
+            {copy.planner}
+            <span className="text-sm font-medium text-[#667085]">
+              {places.length}
+            </span>
+          </h2>
+        </div>
+        <div className="flex gap-2">
+          <button
+            aria-label={copy.newRoute}
+            className="flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#475467] transition hover:border-[#0f766e] hover:text-[#0f766e]"
+            title={copy.newRoute}
+            type="button"
+            onClick={onNewRoute}
+          >
+            <Plus aria-hidden="true" size={18} />
+          </button>
+          <button
+            aria-label="Close"
+            className="flex h-9 w-9 items-center justify-center border border-[#d0d5dd] bg-white text-[#475467] transition hover:bg-[#f2f4f7]"
+            title="Close"
+            type="button"
+            onClick={onClose}
+          >
+            <X aria-hidden="true" size={18} />
+          </button>
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {isAuthenticated && routes.length > 0 ? (
+          <section className="border-b border-[#e1e7ef] p-4">
+            <h3 className="text-xs font-semibold uppercase text-[#667085]">
+              {copy.savedRoutes}
+            </h3>
+            <div className="mt-2 grid gap-2">
+              {routes.map((route) => (
+                <div
+                  className={`grid grid-cols-[1fr_36px] border ${
+                    activeRouteId === route.id
+                      ? "border-[#0f766e] bg-[#f0fdfa]"
+                      : "border-[#e1e7ef] bg-white"
+                  }`}
+                  key={route.id}
+                >
+                  <button
+                    className="min-w-0 px-3 py-2 text-left"
+                    title={copy.openRoute}
+                    type="button"
+                    onClick={() => onOpenRoute(route)}
+                  >
+                    <span className="block truncate text-sm font-semibold text-[#101828]">
+                      {route.title}
+                    </span>
+                    <span className="mt-1 block text-xs text-[#667085]">
+                      {route.places.length} {copy.places}
+                    </span>
+                  </button>
+                  <button
+                    aria-label={copy.deleteRoute}
+                    className="flex items-center justify-center border-l border-[#e1e7ef] text-[#667085] transition hover:text-[#dc2626]"
+                    title={copy.deleteRoute}
+                    type="button"
+                    onClick={() => onDeleteRoute(route.id)}
+                  >
+                    <Trash2 aria-hidden="true" size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="p-4">
+          <label className="block text-sm font-semibold text-[#344054]">
+            {copy.routeTitle}
+            <input
+              className="mt-2 h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-medium text-[#101828] outline-none transition focus:border-[#0f766e] focus:ring-4 focus:ring-[#ccfbf1]"
+              maxLength={100}
+              placeholder={copy.routeTitlePlaceholder}
+              value={title}
+              onChange={(event) => onTitleChange(event.target.value)}
+            />
+          </label>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-[#101828]">{copy.draft}</h3>
+            <span className="text-xs font-semibold text-[#0f766e]">
+              {places.length} {copy.places}
+            </span>
+          </div>
+
+          {places.length === 0 ? (
+            <div className="mt-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center text-sm leading-6 text-[#667085]">
+              {copy.empty}
+            </div>
+          ) : (
+            <ol className="mt-3 space-y-2">
+              {places.map((place, index) => (
+                <li
+                  className="grid grid-cols-[36px_minmax(0,1fr)_72px] items-center border border-[#e1e7ef] bg-white p-2"
+                  key={place.contentId}
+                >
+                  <span
+                    aria-label={`${index + 1} ${copy.stop}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0f766e] text-xs font-bold text-white"
+                  >
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 pr-2">
+                    <p className="truncate text-sm font-semibold text-[#101828]">
+                      {place.title}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-[#667085]">
+                      {place.address}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      aria-label={copy.moveUp}
+                      className="flex h-7 items-center justify-center border border-[#d0d5dd] text-[#667085] disabled:opacity-30"
+                      disabled={index === 0}
+                      title={copy.moveUp}
+                      type="button"
+                      onClick={() => onMovePlace(index, -1)}
+                    >
+                      <ArrowUp aria-hidden="true" size={14} />
+                    </button>
+                    <button
+                      aria-label={copy.moveDown}
+                      className="flex h-7 items-center justify-center border border-[#d0d5dd] text-[#667085] disabled:opacity-30"
+                      disabled={index === places.length - 1}
+                      title={copy.moveDown}
+                      type="button"
+                      onClick={() => onMovePlace(index, 1)}
+                    >
+                      <ArrowDown aria-hidden="true" size={14} />
+                    </button>
+                    <button
+                      aria-label={copy.removePlace}
+                      className="flex h-7 items-center justify-center border border-[#d0d5dd] text-[#667085] transition hover:text-[#dc2626]"
+                      title={copy.removePlace}
+                      type="button"
+                      onClick={() => onRemovePlace(place.contentId)}
+                    >
+                      <X aria-hidden="true" size={14} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {!isAuthenticated ? (
+            <p className="mt-4 border-l-2 border-[#0f766e] pl-3 text-xs leading-5 text-[#475467]">
+              {copy.guest}
+            </p>
+          ) : null}
+
+          {error ? (
+            <p className="mt-4 border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]">
+              {error}
+            </p>
+          ) : null}
+        </section>
+      </div>
+
+      <footer className="shrink-0 border-t border-[#e1e7ef] bg-white p-4">
+        <button
+          className="flex h-11 w-full items-center justify-center gap-2 bg-[#0f766e] px-4 text-sm font-semibold text-white transition hover:bg-[#0b5f59] disabled:bg-[#94c7c2]"
+          disabled={isSaving || places.length === 0 || !title.trim()}
+          type="button"
+          onClick={onSaveRoute}
+        >
+          <Save aria-hidden="true" size={17} />
+          {isAuthenticated ? copy.saveRoute : copy.signInToSave}
+        </button>
+      </footer>
+    </aside>
+  );
+}
