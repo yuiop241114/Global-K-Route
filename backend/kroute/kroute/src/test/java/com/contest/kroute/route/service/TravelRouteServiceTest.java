@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +22,7 @@ import com.contest.kroute.route.domain.TravelRoute;
 import com.contest.kroute.route.dto.RoutePlaceRequest;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.dto.RouteUpsertRequest;
+import com.contest.kroute.route.dto.RouteVisibilityRequest;
 import com.contest.kroute.route.exception.RouteNotFoundException;
 import com.contest.kroute.route.repository.RoutePlaceRepository;
 import com.contest.kroute.route.repository.TravelRouteRepository;
@@ -79,6 +81,21 @@ class TravelRouteServiceTest {
 
 		assertThatThrownBy(() -> routeService.delete(7L, 42L))
 				.isInstanceOf(RouteNotFoundException.class);
+	}
+
+	@Test
+	void publishesOnlyRouteOwnedByCurrentUser() {
+		TravelRoute route = new TravelRoute(
+				new UserAccount("traveler", "traveler@example.com", "password-hash"),
+				"Seoul day trip"
+		);
+		when(routeRepository.findByIdAndUserId(42L, 7L)).thenReturn(Optional.of(route));
+		when(routePlaceRepository.findAllByRouteIdOrderByVisitOrder(null)).thenReturn(List.of());
+
+		RouteResponse response = routeService.changeVisibility(7L, 42L, new RouteVisibilityRequest(true));
+
+		assertThat(response.publicRoute()).isTrue();
+		assertThat(response.publishedAt()).isNotNull();
 	}
 
 	private RoutePlaceRequest place(String contentId, String title) {

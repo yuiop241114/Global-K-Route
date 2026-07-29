@@ -3,6 +3,8 @@
 import {
   ArrowDown,
   ArrowUp,
+  Globe2,
+  Lock,
   Plus,
   Route as RouteIcon,
   Save,
@@ -26,6 +28,9 @@ export type TravelRoute = {
   id: number;
   title: string;
   places: Array<RouteDraftPlace & { id: number; visitOrder: number }>;
+  publicRoute: boolean;
+  publishedAt: string | null;
+  copyCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -47,6 +52,7 @@ type RoutePlannerPanelProps = {
   onNewRoute: () => void;
   onSaveRoute: () => void;
   onDeleteRoute: (routeId: number) => void;
+  onToggleVisibility: (route: TravelRoute) => void;
 };
 
 const COPY = {
@@ -68,6 +74,9 @@ const COPY = {
     moveDown: "아래로 이동",
     stop: "번째 장소",
     places: "개 장소",
+    publicRoute: "공개 코스",
+    privateRoute: "비공개 코스",
+    copies: "회 복사",
   },
   en: {
     planner: "Route planner",
@@ -87,6 +96,9 @@ const COPY = {
     moveDown: "Move down",
     stop: "stop",
     places: "places",
+    publicRoute: "Public route",
+    privateRoute: "Private route",
+    copies: "copies",
   },
 } as const;
 
@@ -107,6 +119,7 @@ export default function RoutePlannerPanel({
   onNewRoute,
   onSaveRoute,
   onDeleteRoute,
+  onToggleVisibility,
 }: RoutePlannerPanelProps) {
   const copy = COPY[language];
 
@@ -156,7 +169,7 @@ export default function RoutePlannerPanel({
             <div className="mt-2 grid gap-2">
               {routes.map((route) => (
                 <div
-                  className={`grid grid-cols-[1fr_36px] border ${
+                  className={`grid grid-cols-[1fr_36px_36px] border ${
                     activeRouteId === route.id
                       ? "border-[#0f766e] bg-[#f0fdfa]"
                       : "border-[#e1e7ef] bg-white"
@@ -174,7 +187,31 @@ export default function RoutePlannerPanel({
                     </span>
                     <span className="mt-1 block text-xs text-[#667085]">
                       {route.places.length} {copy.places}
+                      {route.publicRoute
+                        ? ` · ${route.copyCount} ${copy.copies}`
+                        : ""}
                     </span>
+                  </button>
+                  <button
+                    aria-label={
+                      route.publicRoute ? copy.publicRoute : copy.privateRoute
+                    }
+                    className={`flex items-center justify-center border-l border-[#e1e7ef] transition ${
+                      route.publicRoute
+                        ? "bg-[#f0fdfa] text-[#0f766e]"
+                        : "text-[#667085] hover:text-[#0f766e]"
+                    }`}
+                    title={
+                      route.publicRoute ? copy.publicRoute : copy.privateRoute
+                    }
+                    type="button"
+                    onClick={() => onToggleVisibility(route)}
+                  >
+                    {route.publicRoute ? (
+                      <Globe2 aria-hidden="true" size={16} />
+                    ) : (
+                      <Lock aria-hidden="true" size={16} />
+                    )}
                   </button>
                   <button
                     aria-label={copy.deleteRoute}

@@ -6,9 +6,14 @@ import {
   BookmarkCheck,
   Route as RouteIcon,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import AccountAccess, { type AccountUser } from "@/app/components/AccountAccess";
+import CommunityBoard, {
+  type PopularPlace,
+  type PublicRoute,
+} from "@/app/components/CommunityBoard";
 import RoutePlannerPanel, {
   type RouteDraftPlace,
   type TravelRoute,
@@ -788,6 +793,12 @@ const UI_MESSAGES = {
     routeSaveError: "코스를 처리하지 못했습니다.",
     routeSignIn: "로그인하면 현재 코스를 영구 저장합니다.",
     defaultRouteTitle: "나의 한국 여행",
+    community: "코스 둘러보기",
+    communityLoadError: "공개 코스와 인기 장소를 불러오지 못했습니다.",
+    publishRoute: "이 코스를 공개 게시판에 올리시겠습니까?",
+    privateRoute: "이 코스를 비공개로 전환하시겠습니까?",
+    routeCopyError: "공개 코스를 복사하지 못했습니다.",
+    popularSavedBy: "명이 저장",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
     detailLoading: "상세 정보를 불러오는 중입니다.",
@@ -876,6 +887,12 @@ const UI_MESSAGES = {
     routeSaveError: "The route could not be updated.",
     routeSignIn: "Sign in to save the current route permanently.",
     defaultRouteTitle: "My Korea route",
+    community: "Explore routes",
+    communityLoadError: "Public routes and popular places could not be loaded.",
+    publishRoute: "Publish this route to the community board?",
+    privateRoute: "Make this route private?",
+    routeCopyError: "The public route could not be copied.",
+    popularSavedBy: "travelers saved",
     fallbackCategory: "Spots",
     imageFallback: "No image",
     detailLoading: "Loading place details.",
@@ -987,6 +1004,17 @@ export default function Home() {
   const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState(false);
   const [isRouteSaving, setIsRouteSaving] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [publicRoutes, setPublicRoutes] = useState<PublicRoute[]>([]);
+  const [popularPlaces, setPopularPlaces] = useState<PopularPlace[]>([]);
+  const [isCommunityOpen, setIsCommunityOpen] = useState(false);
+  const [isCommunityLoading, setIsCommunityLoading] = useState(false);
+  const [communityError, setCommunityError] = useState<string | null>(null);
+  const [previewPublicRouteId, setPreviewPublicRouteId] = useState<number | null>(
+    null,
+  );
+  const [communityPreviewPlaces, setCommunityPreviewPlaces] = useState<
+    RouteDraftPlace[] | null
+  >(null);
   const [saveRouteAfterLogin, setSaveRouteAfterLogin] = useState(false);
   const [isRouteDraftHydrated, setIsRouteDraftHydrated] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -1049,6 +1077,34 @@ export default function Home() {
     () => new Set(routeDraftPlaces.map((place) => place.contentId)),
     [routeDraftPlaces],
   );
+
+  const mapRoutePlaces = communityPreviewPlaces ?? routeDraftPlaces;
+
+  const popularPlaceByContentId = useMemo(
+    () => new Map(popularPlaces.map((place) => [place.contentId, place])),
+    [popularPlaces],
+  );
+
+  const loadCommunity = useCallback(async () => {
+    setIsCommunityLoading(true);
+    setCommunityError(null);
+    try {
+      const [routeResponse, popularResponse] = await Promise.all([
+        backendApi<PublicRoute[]>("/public/routes"),
+        backendApi<PopularPlace[]>("/public/places/popular?limit=12"),
+      ]);
+      setPublicRoutes(routeResponse.data);
+      setPopularPlaces(popularResponse.data);
+    } catch (error) {
+      setCommunityError(
+        error instanceof Error
+          ? error.message
+          : "Community data could not be loaded",
+      );
+    } finally {
+      setIsCommunityLoading(false);
+    }
+  }, []);
 
   const handleSessionChange = useCallback((user: AccountUser | null) => {
     setCurrentUser(user);
@@ -1343,8 +1399,100 @@ export default function Home() {
     );
     setRouteError(null);
     setIsSavedPlacesOpen(false);
+    setIsCommunityOpen(false);
+    setPreviewPublicRouteId(null);
+    setCommunityPreviewPlaces(null);
     closePlaceDetail();
     setIsRoutePlannerOpen(true);
+  }
+
+  function closeCommunity() {
+    setIsCommunityOpen(false);
+    setPreviewPublicRouteId(null);
+    setCommunityPreviewPlaces(null);
+  }
+
+  function previewPublicRoute(route: PublicRoute) {
+    setPreviewPublicRouteId(route.id);
+    setCommunityPreviewPlaces(
+      [...route.places]
+        .sort((left, right) => left.visitOrder - right.visitOrder)
+        .map((place) => ({
+          contentId: place.contentId,
+          title: place.title,
+          category: place.category,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          imageUrl: place.imageUrl,
+          dataLanguage: place.dataLanguage,
+          stayMinutes: place.stayMinutes,
+        })),
+    );
+  }
+
+  async function copyPublicRoute(routeId: number) {
+    if (!currentUser) {
+      window.dispatchEvent(new Event("kroute:open-login"));
+      return;
+    }
+
+    setCommunityError(null);
+    try {
+      const response = await backendApi<TravelRoute>(
+        `/public/routes/${routeId}/copy`,
+        { method: "POST" },
+      );
+      setRoutes((previous) => [response.data, ...previous]);
+      openRoute(response.data);
+      void loadCommunity();
+    } catch (error) {
+      setCommunityError(
+        error instanceof Error ? error.message : messages.routeCopyError,
+      );
+    }
+  }
+
+  async function toggleRouteVisibility(route: TravelRoute) {
+    const confirmed = window.confirm(
+      route.publicRoute ? messages.privateRoute : messages.publishRoute,
+    );
+    if (!confirmed) return;
+
+    setRouteError(null);
+    try {
+      const response = await backendApi<TravelRoute>(
+        `/routes/${route.id}/visibility`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ publicRoute: !route.publicRoute }),
+        },
+      );
+      setRoutes((previous) =>
+        previous.map((item) =>
+          item.id === response.data.id ? response.data : item,
+        ),
+      );
+      void loadCommunity();
+    } catch (error) {
+      setRouteError(
+        error instanceof Error ? error.message : messages.routeSaveError,
+      );
+    }
+  }
+
+  function openPopularPlace(place: PopularPlace) {
+    closeCommunity();
+    void openPlaceDetail({
+      contentId: place.contentId,
+      title: place.title,
+      category: place.category,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      distanceMeters: 0,
+      imageUrl: place.imageUrl,
+    });
   }
 
   function requestRouteSave() {
@@ -1437,6 +1585,9 @@ export default function Home() {
     setFailedDetailImageUrls(new Set());
     setIsSavedPlacesOpen(false);
     setIsRoutePlannerOpen(false);
+    setIsCommunityOpen(false);
+    setPreviewPublicRouteId(null);
+    setCommunityPreviewPlaces(null);
 
     if (window.kakao?.maps && mapRef.current) {
       mapRef.current.setCenter(
@@ -1684,11 +1835,11 @@ export default function Home() {
     routePolylineRef.current?.setMap(null);
     routePolylineRef.current = null;
 
-    if (routeDraftPlaces.length === 0) return;
+    if (mapRoutePlaces.length === 0) return;
 
     const kakaoMaps = window.kakao.maps;
     const map = mapRef.current;
-    const path = routeDraftPlaces.map(
+    const path = mapRoutePlaces.map(
       (place) => new kakaoMaps.LatLng(place.latitude, place.longitude),
     );
 
@@ -1696,10 +1847,10 @@ export default function Home() {
       const badge = document.createElement("button");
       badge.type = "button";
       badge.textContent = String(index + 1);
-      badge.title = routeDraftPlaces[index].title;
+      badge.title = mapRoutePlaces[index].title;
       badge.setAttribute(
         "aria-label",
-        `${index + 1}. ${routeDraftPlaces[index].title}`,
+        `${index + 1}. ${mapRoutePlaces[index].title}`,
       );
       Object.assign(badge.style, {
         alignItems: "center",
@@ -1718,7 +1869,7 @@ export default function Home() {
         width: "34px",
       });
       badge.addEventListener("click", () => {
-        const routePlace = routeDraftPlaces[index];
+        const routePlace = mapRoutePlaces[index];
         openPlaceDetailRef.current({
           contentId: routePlace.contentId,
           title: routePlace.title,
@@ -1757,7 +1908,7 @@ export default function Home() {
       map.setCenter(path[0]);
       map.setLevel(5);
     }
-  }, [mapStatus, routeDraftPlaces]);
+  }, [mapRoutePlaces, mapStatus]);
 
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
@@ -1773,6 +1924,8 @@ export default function Home() {
                 savedCount={savedPlaces.length}
                 onOpenSavedPlaces={() => {
                   closePlaceDetail();
+                  closeCommunity();
+                  setIsRoutePlannerOpen(false);
                   setIsSavedPlacesOpen(true);
                 }}
                 onSessionChange={handleSessionChange}
@@ -2016,6 +2169,7 @@ export default function Home() {
                 const isSaved = savedPlaceByContentId.has(place.contentId);
                 const isSaving = savingContentIds.has(place.contentId);
                 const isInRoute = routeContentIds.has(place.contentId);
+                const popularity = popularPlaceByContentId.get(place.contentId);
 
                 return (
                   <article
@@ -2072,6 +2226,11 @@ export default function Home() {
                       <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#2563eb]">
                         {getCategoryLabel(place.category)}
                       </p>
+                      {popularity ? (
+                        <p className="mt-1 text-xs font-semibold text-[#0f766e]">
+                          {popularity.saveCount} {messages.popularSavedBy}
+                        </p>
+                      ) : null}
                         </div>
                       </div>
                     </button>
@@ -2199,6 +2358,25 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               <button
                 className={`flex h-10 items-center gap-2 border px-3 text-sm font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition ${
+                  isCommunityOpen
+                    ? "border-[#2563eb] bg-[#2563eb] text-white"
+                    : "border-white/80 bg-white/88 text-[#2563eb] hover:bg-white"
+                }`}
+                title={messages.community}
+                type="button"
+                onClick={() => {
+                  closePlaceDetail();
+                  setIsSavedPlacesOpen(false);
+                  setIsRoutePlannerOpen(false);
+                  setIsCommunityOpen(true);
+                  void loadCommunity();
+                }}
+              >
+                <Users aria-hidden="true" size={17} />
+                <span>{messages.community}</span>
+              </button>
+              <button
+                className={`flex h-10 items-center gap-2 border px-3 text-sm font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition ${
                   isRoutePlannerOpen
                     ? "border-[#0f766e] bg-[#0f766e] text-white"
                     : "border-white/80 bg-white/88 text-[#0f766e] hover:bg-white"
@@ -2208,6 +2386,7 @@ export default function Home() {
                 onClick={() => {
                   closePlaceDetail();
                   setIsSavedPlacesOpen(false);
+                  closeCommunity();
                   setIsRoutePlannerOpen(true);
                 }}
               >
@@ -2240,6 +2419,23 @@ export default function Home() {
             </div>
           </div>
 
+          {isCommunityOpen ? (
+            <CommunityBoard
+              error={communityError}
+              isAuthenticated={currentUser !== null}
+              isLoading={isCommunityLoading}
+              language={uiLanguage}
+              popularPlaces={popularPlaces}
+              routes={publicRoutes}
+              selectedRouteId={previewPublicRouteId}
+              onClose={closeCommunity}
+              onCopyRoute={(routeId) => void copyPublicRoute(routeId)}
+              onOpenPlace={openPopularPlace}
+              onPreviewRoute={previewPublicRoute}
+              onRefresh={() => void loadCommunity()}
+            />
+          ) : null}
+
           {isRoutePlannerOpen ? (
             <RoutePlannerPanel
               activeRouteId={activeRouteId}
@@ -2263,6 +2459,9 @@ export default function Home() {
               }}
               onSaveRoute={requestRouteSave}
               onTitleChange={setRouteDraftTitle}
+              onToggleVisibility={(route) =>
+                void toggleRouteVisibility(route)
+              }
             />
           ) : null}
 

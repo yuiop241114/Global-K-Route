@@ -43,7 +43,8 @@ public class SecurityConfig {
 				.csrf(csrf -> csrf.csrfTokenRepository(csrfRepository))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/health/**", "/actuator/health/**").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/places/**", "/api/auth/csrf", "/api/auth/me").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/places/**", "/api/public/**",
+								"/api/auth/csrf", "/api/auth/me").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login",
 								"/api/auth/username/reminder", "/api/auth/password/forgot",
 								"/api/auth/password/reset").permitAll()

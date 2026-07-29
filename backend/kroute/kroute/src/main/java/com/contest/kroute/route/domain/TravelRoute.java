@@ -31,6 +31,16 @@ public class TravelRoute {
 	@Column(nullable = false, length = 100)
 	private String title;
 
+	@Column(name = "is_public", nullable = false)
+	private boolean publicRoute;
+
+	@Column(name = "published_at")
+	private Instant publishedAt;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "source_route_id")
+	private TravelRoute sourceRoute;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -51,6 +61,15 @@ public class TravelRoute {
 
 	public void touch() {
 		updatedAt = Instant.now();
+	}
+
+	public void changeVisibility(boolean publicRoute) {
+		this.publicRoute = publicRoute;
+		this.publishedAt = publicRoute ? Instant.now() : null;
+	}
+
+	public void setSourceRoute(TravelRoute sourceRoute) {
+		this.sourceRoute = sourceRoute;
 	}
 
 	@PrePersist
@@ -79,5 +98,13 @@ public class TravelRoute {
 
 	public Instant getUpdatedAt() {
 		return updatedAt;
+	}
+
+	public boolean isPublicRoute() {
+		return publicRoute;
+	}
+
+	public Instant getPublishedAt() {
+		return publishedAt;
 	}
 }

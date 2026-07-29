@@ -5,25 +5,21 @@ import java.util.List;
 
 import com.contest.kroute.route.domain.TravelRoute;
 
-public record RouteResponse(
+public record PublicRouteResponse(
 		Long id,
 		String title,
 		List<RoutePlaceResponse> places,
-		boolean publicRoute,
-		Instant publishedAt,
 		long copyCount,
-		Instant createdAt,
+		Instant publishedAt,
 		Instant updatedAt
 ) {
-	public static RouteResponse from(TravelRoute route, List<RoutePlaceResponse> places, long copyCount) {
-		return new RouteResponse(
+	public static PublicRouteResponse from(TravelRoute route, List<RoutePlaceResponse> places, long copyCount) {
+		return new PublicRouteResponse(
 				route.getId(),
 				route.getTitle(),
 				places,
-				route.isPublicRoute(),
-				route.getPublishedAt(),
 				copyCount,
-				route.getCreatedAt(),
+				route.getPublishedAt(),
 				route.getUpdatedAt()
 		);
 	}

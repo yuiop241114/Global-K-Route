@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +20,7 @@ import com.contest.kroute.auth.security.UserPrincipal;
 import com.contest.kroute.common.ApiResponse;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.dto.RouteUpsertRequest;
+import com.contest.kroute.route.dto.RouteVisibilityRequest;
 import com.contest.kroute.route.service.TravelRouteService;
 
 @RestController
@@ -46,6 +48,15 @@ public class TravelRouteController {
 	public ApiResponse<RouteResponse> update(@AuthenticationPrincipal UserPrincipal user,
 			@PathVariable Long routeId, @Valid @RequestBody RouteUpsertRequest request) {
 		return ApiResponse.ok(routeService.update(user.id(), routeId, request), "Route updated");
+	}
+
+	@PatchMapping("/{routeId}/visibility")
+	public ApiResponse<RouteResponse> changeVisibility(@AuthenticationPrincipal UserPrincipal user,
+			@PathVariable Long routeId, @Valid @RequestBody RouteVisibilityRequest request) {
+		return ApiResponse.ok(
+				routeService.changeVisibility(user.id(), routeId, request),
+				request.publicRoute() ? "Route published" : "Route made private"
+		);
 	}
 
 	@DeleteMapping("/{routeId}")

@@ -16,6 +16,7 @@ import com.contest.kroute.route.dto.RoutePlaceRequest;
 import com.contest.kroute.route.dto.RoutePlaceResponse;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.dto.RouteUpsertRequest;
+import com.contest.kroute.route.dto.RouteVisibilityRequest;
 import com.contest.kroute.route.exception.RouteNotFoundException;
 import com.contest.kroute.route.repository.RoutePlaceRepository;
 import com.contest.kroute.route.repository.TravelRouteRepository;
@@ -47,7 +48,7 @@ public class TravelRouteService {
 		UserAccount user = userAccountRepository.getReferenceById(userId);
 		TravelRoute route = routeRepository.save(new TravelRoute(user, normalizeRequired(request.title())));
 		List<RoutePlace> places = savePlaces(route, request.places());
-		return RouteResponse.from(route, places.stream().map(RoutePlaceResponse::from).toList());
+		return RouteResponse.from(route, places.stream().map(RoutePlaceResponse::from).toList(), 0);
 	}
 
 	@Transactional
@@ -60,7 +61,20 @@ public class TravelRouteService {
 		routePlaceRepository.deleteAllByRouteId(routeId);
 		routePlaceRepository.flush();
 		List<RoutePlace> places = savePlaces(route, request.places());
-		return RouteResponse.from(route, places.stream().map(RoutePlaceResponse::from).toList());
+		return RouteResponse.from(
+				route,
+				places.stream().map(RoutePlaceResponse::from).toList(),
+				routeRepository.countBySourceRouteId(route.getId())
+		);
+	}
+
+	@Transactional
+	public RouteResponse changeVisibility(Long userId, Long routeId, RouteVisibilityRequest request) {
+		TravelRoute route = routeRepository.findByIdAndUserId(routeId, userId)
+				.orElseThrow(RouteNotFoundException::new);
+		route.changeVisibility(request.publicRoute());
+		route.touch();
+		return toResponse(route);
 	}
 
 	@Transactional
@@ -74,7 +88,7 @@ public class TravelRouteService {
 		List<RoutePlaceResponse> places = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(route.getId()).stream()
 				.map(RoutePlaceResponse::from)
 				.toList();
-		return RouteResponse.from(route, places);
+		return RouteResponse.from(route, places, routeRepository.countBySourceRouteId(route.getId()));
 	}
 
 	private List<RoutePlace> savePlaces(TravelRoute route, List<RoutePlaceRequest> requests) {
