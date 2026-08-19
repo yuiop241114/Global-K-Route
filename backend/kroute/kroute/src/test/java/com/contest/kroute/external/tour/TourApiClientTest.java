@@ -125,7 +125,7 @@ class TourApiClientTest {
 				new AppProperties.Upstash(new AppProperties.Upstash.Redis("", "")),
 				new AppProperties.Auth(false, 7, 30),
 				new AppProperties.Frontend("http://localhost:3000"),
-				new AppProperties.Mailjet("https://api.mailjet.com/v3.1", "", "", "", "Global K-Route")
+				new AppProperties.Mail("")
 		);
 	}
 }

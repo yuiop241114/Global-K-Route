@@ -42,6 +42,7 @@ bin/
 
 # Local proposal/reference files
 /proposal.pdf
+/AUTH_SETUP.md
 
 # Local helper scripts
 /scripts/start-backend-dev.ps1

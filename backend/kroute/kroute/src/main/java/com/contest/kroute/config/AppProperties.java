@@ -10,7 +10,7 @@ public record AppProperties(
 		Upstash upstash,
 		Auth auth,
 		Frontend frontend,
-		Mailjet mailjet
+		Mail mail
 ) {
 	public record Cors(String allowedOrigins) {
 	}
@@ -32,6 +32,6 @@ public record AppProperties(
 	public record Frontend(String baseUrl) {
 	}
 
-	public record Mailjet(String baseUrl, String apiKey, String secretKey, String fromEmail, String fromName) {
+	public record Mail(String fromEmail) {
 	}
 }

@@ -35,12 +35,12 @@ public class AuthService {
 	private final PasswordResetTokenRepository resetTokenRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final TokenCodec tokenCodec;
-	private final MailjetMailService mailService;
+	private final SmtpMailService mailService;
 	private final AppProperties appProperties;
 
 	public AuthService(UserAccountRepository userRepository, AuthSessionRepository sessionRepository,
 			PasswordResetTokenRepository resetTokenRepository, PasswordEncoder passwordEncoder,
-			TokenCodec tokenCodec, MailjetMailService mailService, AppProperties appProperties) {
+			TokenCodec tokenCodec, SmtpMailService mailService, AppProperties appProperties) {
 		this.userRepository = userRepository;
 		this.sessionRepository = sessionRepository;
 		this.resetTokenRepository = resetTokenRepository;
