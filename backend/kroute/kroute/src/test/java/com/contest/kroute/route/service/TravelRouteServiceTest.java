@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.contest.kroute.auth.domain.UserAccount;
 import com.contest.kroute.auth.repository.UserAccountRepository;
 import com.contest.kroute.route.domain.TravelRoute;
+import com.contest.kroute.route.domain.RouteTransportMode;
 import com.contest.kroute.route.dto.RoutePlaceRequest;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.dto.RouteUpsertRequest;
@@ -46,10 +47,16 @@ class TravelRouteServiceTest {
 	void createsRouteFromPlacesInRequestedOrder() {
 		Long userId = 7L;
 		UserAccount user = new UserAccount("traveler", "traveler@example.com", "password-hash");
-		RouteUpsertRequest request = new RouteUpsertRequest("Seoul day trip", List.of(
+		RouteUpsertRequest request = new RouteUpsertRequest(
+				"Seoul day trip",
+				"Palace and market walk",
+				java.time.LocalDate.of(2026, 9, 1),
+				RouteTransportMode.WALKING,
+				List.of(
 				place("1001", "Palace"),
 				place("1002", "Market")
-		));
+				)
+		);
 
 		when(userAccountRepository.getReferenceById(userId)).thenReturn(user);
 		when(routeRepository.save(any(TravelRoute.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -58,6 +65,9 @@ class TravelRouteServiceTest {
 		RouteResponse response = routeService.create(userId, request);
 
 		assertThat(response.title()).isEqualTo("Seoul day trip");
+		assertThat(response.description()).isEqualTo("Palace and market walk");
+		assertThat(response.travelDate()).isEqualTo(java.time.LocalDate.of(2026, 9, 1));
+		assertThat(response.transportMode()).isEqualTo(RouteTransportMode.WALKING);
 		assertThat(response.places()).extracting(place -> place.contentId())
 				.containsExactly("1001", "1002");
 		assertThat(response.places()).extracting(place -> place.visitOrder())

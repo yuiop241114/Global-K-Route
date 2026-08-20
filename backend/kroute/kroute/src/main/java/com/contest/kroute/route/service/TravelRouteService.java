@@ -46,7 +46,14 @@ public class TravelRouteService {
 	public RouteResponse create(Long userId, RouteUpsertRequest request) {
 		validateUniquePlaces(request.places());
 		UserAccount user = userAccountRepository.getReferenceById(userId);
-		TravelRoute route = routeRepository.save(new TravelRoute(user, normalizeRequired(request.title())));
+		TravelRoute route = new TravelRoute(user, normalizeRequired(request.title()));
+		route.changeDetails(
+				normalizeRequired(request.title()),
+				normalizeNullable(request.description()),
+				request.travelDate(),
+				request.transportMode()
+		);
+		routeRepository.save(route);
 		List<RoutePlace> places = savePlaces(route, request.places());
 		return RouteResponse.from(route, places.stream().map(RoutePlaceResponse::from).toList(), 0);
 	}
@@ -56,7 +63,12 @@ public class TravelRouteService {
 		validateUniquePlaces(request.places());
 		TravelRoute route = routeRepository.findByIdAndUserId(routeId, userId)
 				.orElseThrow(RouteNotFoundException::new);
-		route.changeTitle(normalizeRequired(request.title()));
+		route.changeDetails(
+				normalizeRequired(request.title()),
+				normalizeNullable(request.description()),
+				request.travelDate(),
+				request.transportMode()
+		);
 		route.touch();
 		routePlaceRepository.deleteAllByRouteId(routeId);
 		routePlaceRepository.flush();

@@ -16,6 +16,7 @@ import CommunityBoard, {
 } from "@/app/components/CommunityBoard";
 import RoutePlannerPanel, {
   type RouteDraftPlace,
+  type RouteTransportMode,
   type TravelRoute,
 } from "@/app/components/RoutePlannerPanel";
 import { backendApi } from "@/app/lib/backend-api";
@@ -798,6 +799,7 @@ const UI_MESSAGES = {
     publishRoute: "이 코스를 공개 게시판에 올리시겠습니까?",
     privateRoute: "이 코스를 비공개로 전환하시겠습니까?",
     routeCopyError: "공개 코스를 복사하지 못했습니다.",
+    directRouteLine: "현재 지도 선은 장소 간 직선 연결입니다.",
     popularSavedBy: "명이 저장",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
@@ -892,6 +894,7 @@ const UI_MESSAGES = {
     publishRoute: "Publish this route to the community board?",
     privateRoute: "Make this route private?",
     routeCopyError: "The public route could not be copied.",
+    directRouteLine: "The current map line connects stops directly.",
     popularSavedBy: "travelers saved",
     fallbackCategory: "Spots",
     imageFallback: "No image",
@@ -1000,6 +1003,10 @@ export default function Home() {
   const [routes, setRoutes] = useState<TravelRoute[]>([]);
   const [activeRouteId, setActiveRouteId] = useState<number | null>(null);
   const [routeDraftTitle, setRouteDraftTitle] = useState("나의 한국 여행");
+  const [routeDraftDescription, setRouteDraftDescription] = useState("");
+  const [routeDraftTravelDate, setRouteDraftTravelDate] = useState("");
+  const [routeDraftTransportMode, setRouteDraftTransportMode] =
+    useState<RouteTransportMode>("WALKING");
   const [routeDraftPlaces, setRouteDraftPlaces] = useState<RouteDraftPlace[]>([]);
   const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState(false);
   const [isRouteSaving, setIsRouteSaving] = useState(false);
@@ -1159,10 +1166,26 @@ export default function Home() {
         if (stored) {
           const parsed = JSON.parse(stored) as {
             title?: unknown;
+            description?: unknown;
+            travelDate?: unknown;
+            transportMode?: unknown;
             places?: unknown;
           };
           if (typeof parsed.title === "string" && parsed.title.trim()) {
             setRouteDraftTitle(parsed.title.slice(0, 100));
+          }
+          if (typeof parsed.description === "string") {
+            setRouteDraftDescription(parsed.description.slice(0, 1000));
+          }
+          if (typeof parsed.travelDate === "string") {
+            setRouteDraftTravelDate(parsed.travelDate);
+          }
+          if (
+            parsed.transportMode === "WALKING" ||
+            parsed.transportMode === "DRIVING" ||
+            parsed.transportMode === "TRANSIT"
+          ) {
+            setRouteDraftTransportMode(parsed.transportMode);
           }
           if (Array.isArray(parsed.places)) {
             setRouteDraftPlaces(
@@ -1184,9 +1207,22 @@ export default function Home() {
     if (!isRouteDraftHydrated) return;
     window.localStorage.setItem(
       ROUTE_DRAFT_STORAGE_KEY,
-      JSON.stringify({ title: routeDraftTitle, places: routeDraftPlaces }),
+      JSON.stringify({
+        title: routeDraftTitle,
+        description: routeDraftDescription,
+        travelDate: routeDraftTravelDate,
+        transportMode: routeDraftTransportMode,
+        places: routeDraftPlaces,
+      }),
     );
-  }, [isRouteDraftHydrated, routeDraftPlaces, routeDraftTitle]);
+  }, [
+    isRouteDraftHydrated,
+    routeDraftDescription,
+    routeDraftPlaces,
+    routeDraftTitle,
+    routeDraftTransportMode,
+    routeDraftTravelDate,
+  ]);
 
   const persistRoute = useCallback(
     async () => {
@@ -1199,6 +1235,9 @@ export default function Home() {
           method: activeRouteId ? "PUT" : "POST",
           body: JSON.stringify({
             title: routeDraftTitle.trim(),
+            description: routeDraftDescription.trim() || null,
+            travelDate: routeDraftTravelDate || null,
+            transportMode: routeDraftTransportMode,
             places: routeDraftPlaces,
           }),
         });
@@ -1219,7 +1258,15 @@ export default function Home() {
         setIsRouteSaving(false);
       }
     },
-    [activeRouteId, routeDraftPlaces, routeDraftTitle, uiLanguage],
+    [
+      activeRouteId,
+      routeDraftDescription,
+      routeDraftPlaces,
+      routeDraftTitle,
+      routeDraftTransportMode,
+      routeDraftTravelDate,
+      uiLanguage,
+    ],
   );
 
   useEffect(() => {
@@ -1372,9 +1419,40 @@ export default function Home() {
     });
   }
 
+  function reorderRoutePlace(fromIndex: number, toIndex: number) {
+    setRouteDraftPlaces((previous) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= previous.length ||
+        toIndex >= previous.length
+      ) {
+        return previous;
+      }
+      const next = [...previous];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
+  function changeRoutePlaceStayMinutes(
+    contentId: string,
+    stayMinutes: number | null,
+  ) {
+    setRouteDraftPlaces((previous) =>
+      previous.map((place) =>
+        place.contentId === contentId ? { ...place, stayMinutes } : place,
+      ),
+    );
+  }
+
   function startNewRoute() {
     setActiveRouteId(null);
     setRouteDraftTitle(messages.defaultRouteTitle);
+    setRouteDraftDescription("");
+    setRouteDraftTravelDate("");
+    setRouteDraftTransportMode("WALKING");
     setRouteDraftPlaces([]);
     setRouteError(null);
   }
@@ -1382,6 +1460,9 @@ export default function Home() {
   function openRoute(route: TravelRoute) {
     setActiveRouteId(route.id);
     setRouteDraftTitle(route.title);
+    setRouteDraftDescription(route.description ?? "");
+    setRouteDraftTravelDate(route.travelDate ?? "");
+    setRouteDraftTransportMode(route.transportMode ?? "WALKING");
     setRouteDraftPlaces(
       [...route.places]
         .sort((left, right) => left.visitOrder - right.visitOrder)
@@ -2356,6 +2437,11 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {mapRoutePlaces.length > 1 ? (
+                <span className="flex h-10 items-center border border-white/80 bg-white/88 px-3 text-xs font-semibold text-[#667085] shadow-[0_8px_20px_rgba(15,23,42,0.08)] backdrop-blur">
+                  {messages.directRouteLine}
+                </span>
+              ) : null}
               <button
                 className={`flex h-10 items-center gap-2 border px-3 text-sm font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition ${
                   isCommunityOpen
@@ -2439,6 +2525,7 @@ export default function Home() {
           {isRoutePlannerOpen ? (
             <RoutePlannerPanel
               activeRouteId={activeRouteId}
+              description={routeDraftDescription}
               error={routeError}
               isAuthenticated={currentUser !== null}
               isSaving={isRouteSaving}
@@ -2446,11 +2533,15 @@ export default function Home() {
               places={routeDraftPlaces}
               routes={routes}
               title={routeDraftTitle}
+              transportMode={routeDraftTransportMode}
+              travelDate={routeDraftTravelDate}
               onClose={() => setIsRoutePlannerOpen(false)}
               onDeleteRoute={(routeId) => void deleteRoute(routeId)}
+              onDescriptionChange={setRouteDraftDescription}
               onMovePlace={moveRoutePlace}
               onNewRoute={startNewRoute}
               onOpenRoute={openRoute}
+              onReorderPlace={reorderRoutePlace}
               onRemovePlace={(contentId) => {
                 setRouteDraftPlaces((previous) =>
                   previous.filter((place) => place.contentId !== contentId),
@@ -2458,7 +2549,10 @@ export default function Home() {
                 setRouteError(null);
               }}
               onSaveRoute={requestRouteSave}
+              onStayMinutesChange={changeRoutePlaceStayMinutes}
               onTitleChange={setRouteDraftTitle}
+              onTransportModeChange={setRouteDraftTransportMode}
+              onTravelDateChange={setRouteDraftTravelDate}
               onToggleVisibility={(route) =>
                 void toggleRouteVisibility(route)
               }

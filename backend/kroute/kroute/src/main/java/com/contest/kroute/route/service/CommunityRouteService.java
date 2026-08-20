@@ -48,6 +48,7 @@ public class CommunityRouteService {
 				.orElseThrow(RouteNotFoundException::new);
 		UserAccount user = userAccountRepository.getReferenceById(userId);
 		TravelRoute copiedRoute = new TravelRoute(user, source.getTitle());
+		copiedRoute.copyDetailsFrom(source);
 		copiedRoute.setSourceRoute(source);
 		routeRepository.save(copiedRoute);
 

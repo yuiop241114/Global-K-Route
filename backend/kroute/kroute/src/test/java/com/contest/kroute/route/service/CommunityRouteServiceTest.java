@@ -18,6 +18,7 @@ import com.contest.kroute.auth.domain.UserAccount;
 import com.contest.kroute.auth.repository.UserAccountRepository;
 import com.contest.kroute.route.domain.RoutePlace;
 import com.contest.kroute.route.domain.TravelRoute;
+import com.contest.kroute.route.domain.RouteTransportMode;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.repository.PopularityRepository;
 import com.contest.kroute.route.repository.RoutePlaceRepository;
@@ -46,6 +47,12 @@ class CommunityRouteServiceTest {
 		UserAccount sourceUser = new UserAccount("source", "source@example.com", "password-hash");
 		UserAccount targetUser = new UserAccount("target", "target@example.com", "password-hash");
 		TravelRoute sourceRoute = new TravelRoute(sourceUser, "Seoul day trip");
+		sourceRoute.changeDetails(
+				"Seoul day trip",
+				"Palace and market walk",
+				java.time.LocalDate.of(2026, 9, 1),
+				RouteTransportMode.WALKING
+		);
 		sourceRoute.changeVisibility(true);
 		RoutePlace sourcePlace = new RoutePlace(
 				sourceRoute,
@@ -70,6 +77,8 @@ class CommunityRouteServiceTest {
 		RouteResponse response = communityRouteService.copyPublicRoute(7L, 10L);
 
 		assertThat(response.title()).isEqualTo("Seoul day trip");
+		assertThat(response.description()).isEqualTo("Palace and market walk");
+		assertThat(response.travelDate()).isEqualTo(java.time.LocalDate.of(2026, 9, 1));
 		assertThat(response.publicRoute()).isFalse();
 		assertThat(response.places()).extracting(place -> place.contentId())
 				.containsExactly("1001");

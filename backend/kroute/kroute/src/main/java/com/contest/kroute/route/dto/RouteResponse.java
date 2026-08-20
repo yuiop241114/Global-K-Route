@@ -4,10 +4,14 @@ import java.time.Instant;
 import java.util.List;
 
 import com.contest.kroute.route.domain.TravelRoute;
+import com.contest.kroute.route.domain.RouteTransportMode;
 
 public record RouteResponse(
 		Long id,
 		String title,
+		String description,
+		java.time.LocalDate travelDate,
+		RouteTransportMode transportMode,
 		List<RoutePlaceResponse> places,
 		boolean publicRoute,
 		Instant publishedAt,
@@ -19,6 +23,9 @@ public record RouteResponse(
 		return new RouteResponse(
 				route.getId(),
 				route.getTitle(),
+				route.getDescription(),
+				route.getTravelDate(),
+				route.getTransportMode(),
 				places,
 				route.isPublicRoute(),
 				route.getPublishedAt(),

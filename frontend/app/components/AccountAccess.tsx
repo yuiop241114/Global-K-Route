@@ -42,7 +42,7 @@ const COPY = {
     mismatch: "비밀번호가 일치하지 않습니다.",
     genericMail: "입력한 이메일과 일치하는 계정이 있으면 안내 메일을 보냈습니다.",
     resetDone: "비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.",
-    working: "처리 중",
+    working: "로그인 중",
   },
   en: {
     savedPlaces: "Saved places",
@@ -66,7 +66,7 @@ const COPY = {
     mismatch: "Passwords do not match.",
     genericMail: "If the email matches an account, recovery instructions have been sent.",
     resetDone: "Your password was changed. Sign in with the new password.",
-    working: "Working",
+    working: "Signing in",
   },
 } as const;
 

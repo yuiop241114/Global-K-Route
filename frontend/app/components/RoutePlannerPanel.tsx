@@ -1,9 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Bus,
+  CalendarDays,
+  Car,
+  Clock3,
+  Footprints,
   Globe2,
+  GripVertical,
   Lock,
   Plus,
   Route as RouteIcon,
@@ -24,9 +31,14 @@ export type RouteDraftPlace = {
   stayMinutes: number | null;
 };
 
+export type RouteTransportMode = "WALKING" | "DRIVING" | "TRANSIT";
+
 export type TravelRoute = {
   id: number;
   title: string;
+  description: string | null;
+  travelDate: string | null;
+  transportMode: RouteTransportMode;
   places: Array<RouteDraftPlace & { id: number; visitOrder: number }>;
   publicRoute: boolean;
   publishedAt: string | null;
@@ -41,12 +53,20 @@ type RoutePlannerPanelProps = {
   routes: TravelRoute[];
   activeRouteId: number | null;
   title: string;
+  description: string;
+  travelDate: string;
+  transportMode: RouteTransportMode;
   places: RouteDraftPlace[];
   error: string | null;
   isSaving: boolean;
   onClose: () => void;
   onTitleChange: (title: string) => void;
+  onDescriptionChange: (description: string) => void;
+  onTravelDateChange: (travelDate: string) => void;
+  onTransportModeChange: (transportMode: RouteTransportMode) => void;
   onMovePlace: (index: number, direction: -1 | 1) => void;
+  onReorderPlace: (fromIndex: number, toIndex: number) => void;
+  onStayMinutesChange: (contentId: string, stayMinutes: number | null) => void;
   onRemovePlace: (contentId: string) => void;
   onOpenRoute: (route: TravelRoute) => void;
   onNewRoute: () => void;
@@ -62,6 +82,17 @@ const COPY = {
     savedRoutes: "저장된 코스",
     routeTitle: "코스 이름",
     routeTitlePlaceholder: "예: 서울 하루 여행",
+    description: "코스 설명",
+    descriptionPlaceholder: "코스의 테마나 방문 계획을 간단히 작성하세요.",
+    travelDate: "여행일",
+    transportMode: "이동수단",
+    walking: "도보",
+    driving: "자동차",
+    transit: "대중교통",
+    stayMinutes: "체류시간",
+    minutes: "분",
+    totalStay: "총 체류",
+    directDistance: "직선거리",
     empty: "검색 결과나 상세 정보에서 코스 추가 버튼을 눌러 장소를 담아보세요.",
     guest: "코스 초안은 이 브라우저에 임시 저장됩니다. 영구 저장할 때 로그인이 필요합니다.",
     newRoute: "새 코스",
@@ -84,6 +115,17 @@ const COPY = {
     savedRoutes: "Saved routes",
     routeTitle: "Route name",
     routeTitlePlaceholder: "e.g. One day in Seoul",
+    description: "Description",
+    descriptionPlaceholder: "Describe the theme or plan for this route.",
+    travelDate: "Travel date",
+    transportMode: "Transport",
+    walking: "Walk",
+    driving: "Drive",
+    transit: "Transit",
+    stayMinutes: "Stay",
+    minutes: "min",
+    totalStay: "Total stay",
+    directDistance: "Direct distance",
     empty: "Add places from search results or place details to start a route.",
     guest: "This draft stays in this browser. Sign in when you want to save it permanently.",
     newRoute: "New route",
@@ -102,18 +144,47 @@ const COPY = {
   },
 } as const;
 
+const TRANSPORT_OPTIONS = [
+  { value: "WALKING" as const, icon: Footprints, labelKey: "walking" as const },
+  { value: "DRIVING" as const, icon: Car, labelKey: "driving" as const },
+  { value: "TRANSIT" as const, icon: Bus, labelKey: "transit" as const },
+];
+
+function directDistanceKm(places: RouteDraftPlace[]) {
+  const earthRadiusKm = 6371;
+  return places.slice(1).reduce((total, place, index) => {
+    const previous = places[index];
+    const lat1 = (previous.latitude * Math.PI) / 180;
+    const lat2 = (place.latitude * Math.PI) / 180;
+    const deltaLat = ((place.latitude - previous.latitude) * Math.PI) / 180;
+    const deltaLng = ((place.longitude - previous.longitude) * Math.PI) / 180;
+    const a =
+      Math.sin(deltaLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+    return total + earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, 0);
+}
+
 export default function RoutePlannerPanel({
   language,
   isAuthenticated,
   routes,
   activeRouteId,
   title,
+  description,
+  travelDate,
+  transportMode,
   places,
   error,
   isSaving,
   onClose,
   onTitleChange,
+  onDescriptionChange,
+  onTravelDateChange,
+  onTransportModeChange,
   onMovePlace,
+  onReorderPlace,
+  onStayMinutesChange,
   onRemovePlace,
   onOpenRoute,
   onNewRoute,
@@ -122,6 +193,12 @@ export default function RoutePlannerPanel({
   onToggleVisibility,
 }: RoutePlannerPanelProps) {
   const copy = COPY[language];
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const totalStayMinutes = places.reduce(
+    (total, place) => total + (place.stayMinutes ?? 0),
+    0,
+  );
+  const distanceKm = directDistanceKm(places);
 
   return (
     <aside className="absolute inset-3 z-40 flex flex-col overflow-hidden border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[440px]">
@@ -240,6 +317,81 @@ export default function RoutePlannerPanel({
             />
           </label>
 
+          <label className="mt-4 block text-sm font-semibold text-[#344054]">
+            {copy.description}
+            <textarea
+              className="mt-2 min-h-20 w-full resize-y border border-[#d0d5dd] bg-white px-3 py-2 text-sm leading-6 text-[#101828] outline-none transition focus:border-[#0f766e] focus:ring-4 focus:ring-[#ccfbf1]"
+              maxLength={1000}
+              placeholder={copy.descriptionPlaceholder}
+              value={description}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+            />
+          </label>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+            <label className="block text-sm font-semibold text-[#344054]">
+              {copy.travelDate}
+              <span className="relative mt-2 block">
+                <CalendarDays
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#667085]"
+                  size={16}
+                />
+                <input
+                  className="h-11 w-full border border-[#d0d5dd] bg-white pl-9 pr-2 text-sm text-[#101828] outline-none focus:border-[#0f766e] focus:ring-4 focus:ring-[#ccfbf1]"
+                  type="date"
+                  value={travelDate}
+                  onChange={(event) => onTravelDateChange(event.target.value)}
+                />
+              </span>
+            </label>
+            <fieldset>
+              <legend className="text-sm font-semibold text-[#344054]">
+                {copy.transportMode}
+              </legend>
+              <div className="mt-2 grid h-11 grid-cols-3 border border-[#d0d5dd] bg-white p-1">
+                {TRANSPORT_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      className={`flex min-w-0 items-center justify-center gap-1 px-1 text-xs font-semibold transition ${
+                        transportMode === option.value
+                          ? "bg-[#0f766e] text-white"
+                          : "text-[#667085] hover:bg-[#f0fdfa]"
+                      }`}
+                      key={option.value}
+                      type="button"
+                      onClick={() => onTransportModeChange(option.value)}
+                    >
+                      <Icon aria-hidden="true" size={14} />
+                      <span className="truncate">{copy[option.labelKey]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </div>
+
+          <dl className="mt-4 grid grid-cols-2 border border-[#d8e1ea] bg-[#f8fafc]">
+            <div className="border-r border-[#d8e1ea] p-3">
+              <dt className="flex items-center gap-1 text-xs font-semibold text-[#667085]">
+                <Clock3 aria-hidden="true" size={14} />
+                {copy.totalStay}
+              </dt>
+              <dd className="mt-1 text-sm font-bold text-[#101828]">
+                {totalStayMinutes} {copy.minutes}
+              </dd>
+            </div>
+            <div className="p-3">
+              <dt className="text-xs font-semibold text-[#667085]">
+                {copy.directDistance}
+              </dt>
+              <dd className="mt-1 text-sm font-bold text-[#101828]">
+                {distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km
+              </dd>
+            </div>
+          </dl>
+
           <div className="mt-4 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-[#101828]">{copy.draft}</h3>
             <span className="text-xs font-semibold text-[#0f766e]">
@@ -255,9 +407,37 @@ export default function RoutePlannerPanel({
             <ol className="mt-3 space-y-2">
               {places.map((place, index) => (
                 <li
-                  className="grid grid-cols-[36px_minmax(0,1fr)_72px] items-center border border-[#e1e7ef] bg-white p-2"
+                  className={`grid grid-cols-[28px_36px_minmax(0,1fr)_72px] items-center border bg-white p-2 transition ${
+                    draggedIndex === index
+                      ? "border-[#0f766e] opacity-60"
+                      : "border-[#e1e7ef]"
+                  }`}
                   key={place.contentId}
+                  onDragEnd={() => setDraggedIndex(null)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+                    if (Number.isInteger(fromIndex) && fromIndex !== index) {
+                      onReorderPlace(fromIndex, index);
+                    }
+                    setDraggedIndex(null);
+                  }}
                 >
+                  <button
+                    aria-label={`${place.title} drag`}
+                    className="flex h-8 w-6 cursor-grab items-center justify-center text-[#98a2b3] active:cursor-grabbing"
+                    draggable
+                    title={language === "ko" ? "드래그해 순서 변경" : "Drag to reorder"}
+                    type="button"
+                    onDragStart={(event) => {
+                      setDraggedIndex(index);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", String(index));
+                    }}
+                  >
+                    <GripVertical aria-hidden="true" size={18} />
+                  </button>
                   <span
                     aria-label={`${index + 1} ${copy.stop}`}
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0f766e] text-xs font-bold text-white"
@@ -303,6 +483,29 @@ export default function RoutePlannerPanel({
                       <X aria-hidden="true" size={14} />
                     </button>
                   </div>
+                  <label className="col-start-3 col-span-2 mt-2 flex items-center justify-end gap-2 border-t border-[#eef2f6] pt-2 text-xs font-semibold text-[#667085]">
+                    {copy.stayMinutes}
+                    <input
+                      aria-label={`${place.title} ${copy.stayMinutes}`}
+                      className="h-8 w-20 border border-[#d0d5dd] px-2 text-right text-sm text-[#101828] outline-none focus:border-[#0f766e]"
+                      inputMode="numeric"
+                      max={720}
+                      min={0}
+                      step={10}
+                      type="number"
+                      value={place.stayMinutes ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        onStayMinutesChange(
+                          place.contentId,
+                          value === ""
+                            ? null
+                            : Math.min(720, Math.max(0, Number(value))),
+                        );
+                      }}
+                    />
+                    {copy.minutes}
+                  </label>
                 </li>
               ))}
             </ol>
