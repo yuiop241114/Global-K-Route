@@ -18,6 +18,8 @@ import RoutePlannerPanel, {
   type RouteDraftPlace,
   type RouteTransportMode,
   type TravelRoute,
+  type WalkingRouteStatus,
+  type WalkingRouteSummary,
 } from "@/app/components/RoutePlannerPanel";
 import { backendApi } from "@/app/lib/backend-api";
 
@@ -125,6 +127,13 @@ type ApiResponse<T> = {
   data: T;
   message: string | null;
   timestamp: string;
+};
+
+type WalkingRoutePath = WalkingRouteSummary & {
+  coordinates: Array<{
+    latitude: number;
+    longitude: number;
+  }>;
 };
 
 type SelectedPoint = {
@@ -800,6 +809,9 @@ const UI_MESSAGES = {
     privateRoute: "이 코스를 비공개로 전환하시겠습니까?",
     routeCopyError: "공개 코스를 복사하지 못했습니다.",
     directRouteLine: "현재 지도 선은 장소 간 직선 연결입니다.",
+    walkingRouteLoading: "도보 동선을 계산하고 있습니다.",
+    walkingRouteReady: "실제 도보 동선",
+    walkingRouteFallback: "도보 동선을 불러오지 못해 직선으로 표시합니다.",
     popularSavedBy: "명이 저장",
     fallbackCategory: "관광지",
     imageFallback: "이미지 없음",
@@ -895,6 +907,9 @@ const UI_MESSAGES = {
     privateRoute: "Make this route private?",
     routeCopyError: "The public route could not be copied.",
     directRouteLine: "The current map line connects stops directly.",
+    walkingRouteLoading: "Calculating the walking route.",
+    walkingRouteReady: "Walking route",
+    walkingRouteFallback: "The walking route is unavailable, so stops are connected directly.",
     popularSavedBy: "travelers saved",
     fallbackCategory: "Spots",
     imageFallback: "No image",
@@ -1008,6 +1023,9 @@ export default function Home() {
   const [routeDraftTransportMode, setRouteDraftTransportMode] =
     useState<RouteTransportMode>("WALKING");
   const [routeDraftPlaces, setRouteDraftPlaces] = useState<RouteDraftPlace[]>([]);
+  const [walkingRoutePath, setWalkingRoutePath] = useState<WalkingRoutePath | null>(null);
+  const [walkingRouteStatus, setWalkingRouteStatus] =
+    useState<WalkingRouteStatus>("idle");
   const [isRoutePlannerOpen, setIsRoutePlannerOpen] = useState(false);
   const [isRouteSaving, setIsRouteSaving] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -1054,6 +1072,8 @@ export default function Home() {
   const placeMarkersRef = useRef<KakaoMarker[]>([]);
   const routeMarkersRef = useRef<KakaoCustomOverlay[]>([]);
   const routePolylineRef = useRef<KakaoPolyline | null>(null);
+  const walkingRouteCacheRef = useRef<Map<string, WalkingRoutePath>>(new Map());
+  const walkingRouteRequestIdRef = useRef(0);
   const openPlaceDetailRef = useRef<(place: Place) => void>(() => undefined);
   const detailRequestIdRef = useRef(0);
   const savedPlacesRequestIdRef = useRef(0);
@@ -1086,6 +1106,17 @@ export default function Home() {
   );
 
   const mapRoutePlaces = communityPreviewPlaces ?? routeDraftPlaces;
+  const mapRouteTransportMode = communityPreviewPlaces
+    ? publicRoutes.find((route) => route.id === previewPublicRouteId)?.transportMode ??
+      "WALKING"
+    : routeDraftTransportMode;
+
+  const walkingRouteSummary: WalkingRouteSummary | null = walkingRoutePath
+    ? {
+        totalDistanceMeters: walkingRoutePath.totalDistanceMeters,
+        totalDurationSeconds: walkingRoutePath.totalDurationSeconds,
+      }
+    : null;
 
   const popularPlaceByContentId = useMemo(
     () => new Map(popularPlaces.map((place) => [place.contentId, place])),
@@ -1223,6 +1254,71 @@ export default function Home() {
     routeDraftTransportMode,
     routeDraftTravelDate,
   ]);
+
+  useEffect(() => {
+    const requestId = walkingRouteRequestIdRef.current + 1;
+    walkingRouteRequestIdRef.current = requestId;
+
+    if (mapRouteTransportMode !== "WALKING" || mapRoutePlaces.length < 2) {
+      const resetTimer = window.setTimeout(() => {
+        setWalkingRoutePath(null);
+        setWalkingRouteStatus("idle");
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
+    }
+
+    const cacheKey = mapRoutePlaces
+      .map((place) => `${place.latitude.toFixed(6)},${place.longitude.toFixed(6)}`)
+      .join("|");
+    const cachedRoute = walkingRouteCacheRef.current.get(cacheKey);
+    if (cachedRoute) {
+      const cacheTimer = window.setTimeout(() => {
+        setWalkingRoutePath(cachedRoute);
+        setWalkingRouteStatus("ready");
+      }, 0);
+      return () => window.clearTimeout(cacheTimer);
+    }
+
+    const loadingTimer = window.setTimeout(() => {
+      setWalkingRoutePath(null);
+      setWalkingRouteStatus("loading");
+    }, 0);
+    const abortController = new AbortController();
+    const requestTimer = window.setTimeout(() => {
+      backendApi<WalkingRoutePath>("/public/routes/walking-path", {
+        method: "POST",
+        signal: abortController.signal,
+        body: JSON.stringify({
+          points: mapRoutePlaces.map((place) => ({
+            latitude: place.latitude,
+            longitude: place.longitude,
+          })),
+        }),
+      })
+        .then((response) => {
+          if (walkingRouteRequestIdRef.current !== requestId) return;
+          walkingRouteCacheRef.current.set(cacheKey, response.data);
+          setWalkingRoutePath(response.data);
+          setWalkingRouteStatus("ready");
+        })
+        .catch((error: unknown) => {
+          if (
+            walkingRouteRequestIdRef.current !== requestId ||
+            (error instanceof DOMException && error.name === "AbortError")
+          ) {
+            return;
+          }
+          setWalkingRoutePath(null);
+          setWalkingRouteStatus("error");
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(loadingTimer);
+      window.clearTimeout(requestTimer);
+      abortController.abort();
+    };
+  }, [mapRoutePlaces, mapRouteTransportMode]);
 
   const persistRoute = useCallback(
     async () => {
@@ -1920,11 +2016,21 @@ export default function Home() {
 
     const kakaoMaps = window.kakao.maps;
     const map = mapRef.current;
-    const path = mapRoutePlaces.map(
+    const stopPath = mapRoutePlaces.map(
       (place) => new kakaoMaps.LatLng(place.latitude, place.longitude),
     );
+    const hasWalkingPath =
+      mapRouteTransportMode === "WALKING" &&
+      walkingRouteStatus === "ready" &&
+      walkingRoutePath !== null &&
+      walkingRoutePath.coordinates.length > 1;
+    const routePath = hasWalkingPath
+      ? walkingRoutePath.coordinates.map(
+          (coordinate) => new kakaoMaps.LatLng(coordinate.latitude, coordinate.longitude),
+        )
+      : stopPath;
 
-    routeMarkersRef.current = path.map((position, index) => {
+    routeMarkersRef.current = stopPath.map((position, index) => {
       const badge = document.createElement("button");
       badge.type = "button";
       badge.textContent = String(index + 1);
@@ -1973,23 +2079,24 @@ export default function Home() {
       });
     });
 
-    if (path.length > 1) {
+    if (routePath.length > 1) {
       routePolylineRef.current = new kakaoMaps.Polyline({
         map,
-        path,
+        path: routePath,
         strokeWeight: 5,
         strokeColor: "#0f766e",
-        strokeOpacity: 0.82,
-        strokeStyle: "solid",
+        strokeOpacity: hasWalkingPath ? 0.9 : 0.64,
+        strokeStyle: hasWalkingPath ? "solid" : "shortdash",
       });
       const bounds = new kakaoMaps.LatLngBounds();
-      path.forEach((position) => bounds.extend(position));
+      routePath.forEach((position) => bounds.extend(position));
+      stopPath.forEach((position) => bounds.extend(position));
       map.setBounds(bounds);
     } else {
-      map.setCenter(path[0]);
+      map.setCenter(stopPath[0]);
       map.setLevel(5);
     }
-  }, [mapRoutePlaces, mapStatus]);
+  }, [mapRoutePlaces, mapRouteTransportMode, mapStatus, walkingRoutePath, walkingRouteStatus]);
 
   return (
     <main className="min-h-screen min-w-0 overflow-x-hidden bg-[#e9eef3] text-[#101828] lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
@@ -2439,7 +2546,25 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               {mapRoutePlaces.length > 1 ? (
                 <span className="flex h-10 items-center border border-white/80 bg-white/88 px-3 text-xs font-semibold text-[#667085] shadow-[0_8px_20px_rgba(15,23,42,0.08)] backdrop-blur">
-                  {messages.directRouteLine}
+                  {mapRouteTransportMode === "WALKING" &&
+                  walkingRouteStatus === "ready" &&
+                  walkingRoutePath ? (
+                    <>
+                      {messages.walkingRouteReady} ·{" "}
+                      {(walkingRoutePath.totalDistanceMeters / 1000).toFixed(
+                        walkingRoutePath.totalDistanceMeters < 10000 ? 1 : 0,
+                      )}{" "}
+                      km · {Math.max(1, Math.ceil(walkingRoutePath.totalDurationSeconds / 60))}
+                      {uiLanguage === "ko" ? "분" : " min"}
+                    </>
+                  ) : mapRouteTransportMode === "WALKING" &&
+                    walkingRouteStatus !== "error" ? (
+                    messages.walkingRouteLoading
+                  ) : mapRouteTransportMode === "WALKING" ? (
+                    messages.walkingRouteFallback
+                  ) : (
+                    messages.directRouteLine
+                  )}
                 </span>
               ) : null}
               <button
@@ -2535,6 +2660,8 @@ export default function Home() {
               title={routeDraftTitle}
               transportMode={routeDraftTransportMode}
               travelDate={routeDraftTravelDate}
+              walkingRouteStatus={walkingRouteStatus}
+              walkingRouteSummary={walkingRouteSummary}
               onClose={() => setIsRoutePlannerOpen(false)}
               onDeleteRoute={(routeId) => void deleteRoute(routeId)}
               onDescriptionChange={setRouteDraftDescription}

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.contest.kroute.place.exception.PlaceNotFoundException;
 import com.contest.kroute.auth.exception.AuthException;
 import com.contest.kroute.route.exception.RouteNotFoundException;
+import com.contest.kroute.route.exception.WalkingRouteUnavailableException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -57,6 +58,14 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<Map<String, Object>> handleRouteNotFoundException(RouteNotFoundException exception) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(errorBody(HttpStatus.NOT_FOUND, exception.getMessage()));
+	}
+
+	@ExceptionHandler(WalkingRouteUnavailableException.class)
+	public ResponseEntity<Map<String, Object>> handleWalkingRouteUnavailableException(
+			WalkingRouteUnavailableException exception) {
+		log.warn("Walking route unavailable: {}", exception.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+				.body(errorBody(HttpStatus.BAD_GATEWAY, exception.getMessage()));
 	}
 
 	@ExceptionHandler(AuthException.class)

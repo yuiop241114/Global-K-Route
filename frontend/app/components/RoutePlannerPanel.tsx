@@ -33,6 +33,13 @@ export type RouteDraftPlace = {
 
 export type RouteTransportMode = "WALKING" | "DRIVING" | "TRANSIT";
 
+export type WalkingRouteSummary = {
+  totalDistanceMeters: number;
+  totalDurationSeconds: number;
+};
+
+export type WalkingRouteStatus = "idle" | "loading" | "ready" | "error";
+
 export type TravelRoute = {
   id: number;
   title: string;
@@ -57,6 +64,8 @@ type RoutePlannerPanelProps = {
   travelDate: string;
   transportMode: RouteTransportMode;
   places: RouteDraftPlace[];
+  walkingRouteSummary: WalkingRouteSummary | null;
+  walkingRouteStatus: WalkingRouteStatus;
   error: string | null;
   isSaving: boolean;
   onClose: () => void;
@@ -93,6 +102,9 @@ const COPY = {
     minutes: "분",
     totalStay: "총 체류",
     directDistance: "직선거리",
+    walkingRoute: "도보 동선",
+    walkingRouteLoading: "계산 중",
+    walkingRouteUnavailable: "직선거리로 대체",
     empty: "검색 결과나 상세 정보에서 코스 추가 버튼을 눌러 장소를 담아보세요.",
     guest: "코스 초안은 이 브라우저에 임시 저장됩니다. 영구 저장할 때 로그인이 필요합니다.",
     newRoute: "새 코스",
@@ -126,6 +138,9 @@ const COPY = {
     minutes: "min",
     totalStay: "Total stay",
     directDistance: "Direct distance",
+    walkingRoute: "Walking route",
+    walkingRouteLoading: "Calculating",
+    walkingRouteUnavailable: "Using direct distance",
     empty: "Add places from search results or place details to start a route.",
     guest: "This draft stays in this browser. Sign in when you want to save it permanently.",
     newRoute: "New route",
@@ -175,6 +190,8 @@ export default function RoutePlannerPanel({
   travelDate,
   transportMode,
   places,
+  walkingRouteSummary,
+  walkingRouteStatus,
   error,
   isSaving,
   onClose,
@@ -199,6 +216,11 @@ export default function RoutePlannerPanel({
     0,
   );
   const distanceKm = directDistanceKm(places);
+  const walkingDistanceKm = (walkingRouteSummary?.totalDistanceMeters ?? 0) / 1000;
+  const walkingMinutes = Math.max(
+    1,
+    Math.ceil((walkingRouteSummary?.totalDurationSeconds ?? 0) / 60),
+  );
 
   return (
     <aside className="absolute inset-3 z-40 flex flex-col overflow-hidden border border-white/80 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur md:bottom-5 md:left-auto md:right-5 md:top-24 md:w-[440px]">
@@ -384,10 +406,30 @@ export default function RoutePlannerPanel({
             </div>
             <div className="p-3">
               <dt className="text-xs font-semibold text-[#667085]">
-                {copy.directDistance}
+                {transportMode === "WALKING" ? copy.walkingRoute : copy.directDistance}
               </dt>
               <dd className="mt-1 text-sm font-bold text-[#101828]">
-                {distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km
+                {transportMode === "WALKING" && walkingRouteStatus === "ready" ? (
+                  <>
+                    {walkingDistanceKm.toFixed(walkingDistanceKm < 10 ? 1 : 0)} km
+                    <span className="ml-1 font-semibold text-[#667085]">
+                      · {walkingMinutes} {copy.minutes}
+                    </span>
+                  </>
+                ) : transportMode === "WALKING" &&
+                  (walkingRouteStatus === "loading" || walkingRouteStatus === "idle") &&
+                  places.length > 1 ? (
+                  copy.walkingRouteLoading
+                ) : (
+                  <>
+                    {distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km
+                    {transportMode === "WALKING" && walkingRouteStatus === "error" ? (
+                      <span className="ml-1 block text-xs font-semibold text-[#b54708]">
+                        {copy.walkingRouteUnavailable}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </dd>
             </div>
           </dl>
