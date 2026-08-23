@@ -12,12 +12,12 @@ public record PublicRouteResponse(
 		String description,
 		java.time.LocalDate travelDate,
 		RouteTransportMode transportMode,
-		List<RoutePlaceResponse> places,
+		List<PublicRoutePlaceResponse> places,
 		long copyCount,
 		Instant publishedAt,
 		Instant updatedAt
 ) {
-	public static PublicRouteResponse from(TravelRoute route, List<RoutePlaceResponse> places, long copyCount) {
+	public static PublicRouteResponse from(TravelRoute route, List<PublicRoutePlaceResponse> places, long copyCount) {
 		return new PublicRouteResponse(
 				route.getId(),
 				route.getTitle(),

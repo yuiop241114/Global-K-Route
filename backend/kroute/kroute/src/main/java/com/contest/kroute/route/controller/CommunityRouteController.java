@@ -33,6 +33,11 @@ public class CommunityRouteController {
 		return ApiResponse.ok(communityRouteService.findPublicRoutes());
 	}
 
+	@GetMapping("/routes/{routeId}")
+	public ApiResponse<PublicRouteResponse> findPublicRoute(@PathVariable Long routeId) {
+		return ApiResponse.ok(communityRouteService.findPublicRoute(routeId));
+	}
+
 	@PostMapping("/routes/{routeId}/copy")
 	public ApiResponse<RouteResponse> copyPublicRoute(@AuthenticationPrincipal UserPrincipal user,
 			@PathVariable Long routeId) {

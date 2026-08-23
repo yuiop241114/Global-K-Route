@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
+  Check,
   Clock3,
   Copy,
   Eye,
@@ -12,6 +13,7 @@ import {
   RefreshCw,
   Route as RouteIcon,
   Search,
+  Share2,
   TrendingUp,
   Users,
   X,
@@ -24,7 +26,9 @@ export type PublicRoute = {
   description: string | null;
   travelDate: string | null;
   transportMode: "WALKING" | "DRIVING" | "TRANSIT";
-  places: Array<RouteDraftPlace & { id: number; visitOrder: number }>;
+  places: Array<
+    RouteDraftPlace & { id: number; visitOrder: number; saveCount: number }
+  >;
   copyCount: number;
   publishedAt: string;
   updatedAt: string;
@@ -37,6 +41,7 @@ type CommunityBoardProps = {
   routes: PublicRoute[];
   popularPlaces: PopularPlace[];
   selectedRouteId: number | null;
+  initialDetailRouteId: number | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -44,7 +49,7 @@ type CommunityBoardProps = {
   onRefresh: () => void;
   onPreviewRoute: (route: PublicRoute) => void;
   onCopyRoute: (routeId: number) => void;
-  onOpenPlace: (place: PopularPlace) => void;
+  onOpenPlace: (place: RouteDraftPlace) => void;
 };
 
 type RouteSort = "latest" | "popular" | "placeCount";
@@ -64,6 +69,9 @@ const COPY_TEXT = {
     preview: "지도 미리보기",
     copy: "내 코스로 복사",
     signInCopy: "로그인 후 복사",
+    share: "코스 공유",
+    linkCopied: "링크 복사됨",
+    copyLinkPrompt: "아래 코스 공유 링크를 복사하세요.",
     refresh: "새로고침",
     close: "닫기",
     backToRoutes: "공개 코스 목록으로 돌아가기",
@@ -106,6 +114,9 @@ const COPY_TEXT = {
     preview: "Preview on map",
     copy: "Copy to my routes",
     signInCopy: "Sign in to copy",
+    share: "Share route",
+    linkCopied: "Link copied",
+    copyLinkPrompt: "Copy this route link.",
     refresh: "Refresh",
     close: "Close",
     backToRoutes: "Back to public routes",
@@ -175,6 +186,7 @@ export default function CommunityBoard({
   routes,
   popularPlaces,
   selectedRouteId,
+  initialDetailRouteId,
   isAuthenticated,
   isLoading,
   error,
@@ -188,7 +200,23 @@ export default function CommunityBoard({
   const [searchQuery, setSearchQuery] = useState("");
   const [routeSort, setRouteSort] = useState<RouteSort>("latest");
   const [detailRouteId, setDetailRouteId] = useState<number | null>(null);
+  const [copiedShareRouteId, setCopiedShareRouteId] = useState<number | null>(null);
   const copy = COPY_TEXT[language];
+
+  useEffect(() => {
+    if (
+      initialDetailRouteId === null ||
+      !routes.some((route) => route.id === initialDetailRouteId)
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setTab("routes");
+      setDetailRouteId(initialDetailRouteId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialDetailRouteId, routes]);
 
   const visibleRoutes = useMemo(() => {
     const locale = language === "ko" ? "ko-KR" : "en-US";
@@ -242,6 +270,24 @@ export default function CommunityBoard({
     if (mode === "DRIVING") return copy.driving;
     if (mode === "TRANSIT") return copy.transit;
     return copy.walking;
+  }
+
+  async function shareRoute(route: PublicRoute) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set("route", String(route.id));
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: route.title, url: url.toString() });
+        return;
+      }
+      await navigator.clipboard.writeText(url.toString());
+      setCopiedShareRouteId(route.id);
+      window.setTimeout(() => setCopiedShareRouteId(null), 2000);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      window.prompt(copy.copyLinkPrompt, url.toString());
+    }
   }
 
   return (
@@ -435,27 +481,36 @@ export default function CommunityBoard({
               <h4 className="text-sm font-semibold text-[#101828]">{copy.stops}</h4>
               <ol className="mt-3 space-y-2">
                 {orderedDetailPlaces.map((place, index) => (
-                  <li className="grid grid-cols-[36px_56px_minmax(0,1fr)] items-center gap-3 border border-[#e1e7ef] bg-white p-2" key={`${place.id}-${place.contentId}`}>
-                    <span aria-label={`${copy.stop} ${index + 1}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#101828] text-xs font-bold text-white">{index + 1}</span>
-                    {place.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" className="h-14 w-14 object-cover" src={place.imageUrl} />
-                    ) : (
-                      <span className="flex h-14 w-14 items-center justify-center bg-[#edf3f8] text-[#667085]"><MapPin aria-hidden="true" size={19} /></span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="block break-words text-sm font-semibold text-[#101828]">{place.title}</span>
-                      <span className="mt-1 block break-words text-xs leading-5 text-[#667085]">{place.address || copy.addressUnavailable}</span>
-                      {place.stayMinutes !== null ? <span className="mt-1 block text-xs font-semibold text-[#2563eb]">{place.stayMinutes} {copy.minutes}</span> : null}
-                    </span>
+                  <li key={`${place.id}-${place.contentId}`}>
+                    <button className="grid w-full grid-cols-[36px_56px_minmax(0,1fr)] items-center gap-3 border border-[#e1e7ef] bg-white p-2 text-left transition hover:border-[#98a2b3] hover:bg-[#f8fafc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]" type="button" onClick={() => onOpenPlace(place)}>
+                      <span aria-label={`${copy.stop} ${index + 1}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#101828] text-xs font-bold text-white">{index + 1}</span>
+                      {place.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" className="h-14 w-14 object-cover" src={place.imageUrl} />
+                      ) : (
+                        <span className="flex h-14 w-14 items-center justify-center bg-[#edf3f8] text-[#667085]"><MapPin aria-hidden="true" size={19} /></span>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm font-semibold text-[#101828]">{place.title}</span>
+                        <span className="mt-1 block break-words text-xs leading-5 text-[#667085]">{place.address || copy.addressUnavailable}</span>
+                        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
+                          {place.stayMinutes !== null ? <span className="text-[#2563eb]">{place.stayMinutes} {copy.minutes}</span> : null}
+                          <span className="text-[#0f766e]">{place.saveCount} {copy.savedBy}</span>
+                        </span>
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ol>
             </div>
 
-            <div className="sticky bottom-0 grid grid-cols-2 border border-[#d0d5dd] bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+            <div className="sticky bottom-0 grid grid-cols-3 border border-[#d0d5dd] bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
               <button className="flex min-h-12 items-center justify-center gap-2 px-3 text-sm font-semibold text-[#2563eb] transition hover:bg-[#eff6ff] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb]" type="button" onClick={() => onPreviewRoute(detailRoute)}>
                 <Eye aria-hidden="true" size={17} />{copy.preview}
+              </button>
+              <button className="flex min-h-12 items-center justify-center gap-2 border-l border-[#d0d5dd] px-2 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb] sm:px-3 sm:text-sm" type="button" onClick={() => void shareRoute(detailRoute)}>
+                {copiedShareRouteId === detailRoute.id ? <Check aria-hidden="true" size={17} /> : <Share2 aria-hidden="true" size={17} />}
+                {copiedShareRouteId === detailRoute.id ? copy.linkCopied : copy.share}
               </button>
               <button className="flex min-h-12 items-center justify-center gap-2 border-l border-[#d0d5dd] px-3 text-sm font-semibold text-[#0f766e] transition hover:bg-[#f0fdfa] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb]" type="button" onClick={() => onCopyRoute(detailRoute.id)}>
                 <Copy aria-hidden="true" size={17} />{isAuthenticated ? copy.copy : copy.signInCopy}

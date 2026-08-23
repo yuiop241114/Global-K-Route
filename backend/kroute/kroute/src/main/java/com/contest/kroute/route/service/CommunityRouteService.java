@@ -1,6 +1,7 @@
 package com.contest.kroute.route.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import com.contest.kroute.auth.repository.UserAccountRepository;
 import com.contest.kroute.route.domain.RoutePlace;
 import com.contest.kroute.route.domain.TravelRoute;
 import com.contest.kroute.route.dto.PopularPlaceResponse;
+import com.contest.kroute.route.dto.PublicRoutePlaceResponse;
 import com.contest.kroute.route.dto.PublicRouteResponse;
 import com.contest.kroute.route.dto.RoutePlaceResponse;
 import com.contest.kroute.route.dto.RouteResponse;
@@ -42,6 +44,13 @@ public class CommunityRouteService {
 				.toList();
 	}
 
+	@Transactional(readOnly = true)
+	public PublicRouteResponse findPublicRoute(Long routeId) {
+		TravelRoute route = routeRepository.findByIdAndPublicRouteTrue(routeId)
+				.orElseThrow(RouteNotFoundException::new);
+		return toPublicResponse(route);
+	}
+
 	@Transactional
 	public RouteResponse copyPublicRoute(Long userId, Long routeId) {
 		TravelRoute source = routeRepository.findByIdAndPublicRouteTrue(routeId)
@@ -71,8 +80,15 @@ public class CommunityRouteService {
 	}
 
 	private PublicRouteResponse toPublicResponse(TravelRoute route) {
-		List<RoutePlaceResponse> places = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(route.getId()).stream()
-				.map(RoutePlaceResponse::from)
+		List<RoutePlace> routePlaces = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(route.getId());
+		Map<String, Long> saveCounts = popularityRepository.findSaveCountsByContentIds(
+				routePlaces.stream().map(RoutePlace::getContentId).distinct().toList()
+		);
+		List<PublicRoutePlaceResponse> places = routePlaces.stream()
+				.map(place -> PublicRoutePlaceResponse.from(
+						place,
+						saveCounts.getOrDefault(place.getContentId(), 0L)
+				))
 				.toList();
 		return PublicRouteResponse.from(route, places, routeRepository.countBySourceRouteId(route.getId()));
 	}

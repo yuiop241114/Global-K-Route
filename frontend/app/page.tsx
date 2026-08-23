@@ -995,6 +995,22 @@ function isRouteDraftPlace(value: unknown): value is RouteDraftPlace {
   );
 }
 
+function toRouteDraftPlaces(route: PublicRoute): RouteDraftPlace[] {
+  return [...route.places]
+    .sort((left, right) => left.visitOrder - right.visitOrder)
+    .map((place) => ({
+      contentId: place.contentId,
+      title: place.title,
+      category: place.category,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      imageUrl: place.imageUrl,
+      dataLanguage: place.dataLanguage,
+      stayMinutes: place.stayMinutes,
+    }));
+}
+
 export default function Home() {
   const [selectedArea, setSelectedArea] = useState<Area>(AREAS[0]);
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint>({
@@ -1037,6 +1053,9 @@ export default function Home() {
   const [previewPublicRouteId, setPreviewPublicRouteId] = useState<number | null>(
     null,
   );
+  const [sharedCommunityRouteId, setSharedCommunityRouteId] = useState<
+    number | null
+  >(null);
   const [communityPreviewPlaces, setCommunityPreviewPlaces] = useState<
     RouteDraftPlace[] | null
   >(null);
@@ -1078,6 +1097,7 @@ export default function Home() {
   const detailRequestIdRef = useRef(0);
   const savedPlacesRequestIdRef = useRef(0);
   const routesRequestIdRef = useRef(0);
+  const sharedRouteHandledRef = useRef(false);
 
   const apiBaseUrl = useMemo(() => {
     return "/backend-api";
@@ -1142,6 +1162,44 @@ export default function Home() {
     } finally {
       setIsCommunityLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (sharedRouteHandledRef.current) return;
+
+    const routeIdValue = new URLSearchParams(window.location.search).get("route");
+    const routeId = routeIdValue ? Number(routeIdValue) : Number.NaN;
+    if (!Number.isSafeInteger(routeId) || routeId <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      if (sharedRouteHandledRef.current) return;
+      sharedRouteHandledRef.current = true;
+      setIsCommunityOpen(true);
+      setIsCommunityLoading(true);
+      setCommunityError(null);
+      setPreviewPublicRouteId(routeId);
+      setSharedCommunityRouteId(routeId);
+
+      Promise.all([
+        backendApi<PublicRoute>(`/public/routes/${routeId}`),
+        backendApi<PopularPlace[]>("/public/places/popular?limit=12"),
+      ])
+        .then(([routeResponse, popularResponse]) => {
+          setPublicRoutes([routeResponse.data]);
+          setPopularPlaces(popularResponse.data);
+          setCommunityPreviewPlaces(toRouteDraftPlaces(routeResponse.data));
+        })
+        .catch((error) => {
+          setCommunityError(
+            error instanceof Error
+              ? error.message
+              : "The shared route could not be loaded",
+          );
+        })
+        .finally(() => setIsCommunityLoading(false));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const handleSessionChange = useCallback((user: AccountUser | null) => {
@@ -1578,34 +1636,31 @@ export default function Home() {
     setIsSavedPlacesOpen(false);
     setIsCommunityOpen(false);
     setPreviewPublicRouteId(null);
+    setSharedCommunityRouteId(null);
     setCommunityPreviewPlaces(null);
+    clearSharedRouteQuery();
     closePlaceDetail();
     setIsRoutePlannerOpen(true);
+  }
+
+  function clearSharedRouteQuery() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("route")) return;
+    url.searchParams.delete("route");
+    window.history.replaceState(window.history.state, "", url);
   }
 
   function closeCommunity() {
     setIsCommunityOpen(false);
     setPreviewPublicRouteId(null);
+    setSharedCommunityRouteId(null);
     setCommunityPreviewPlaces(null);
+    clearSharedRouteQuery();
   }
 
   function previewPublicRoute(route: PublicRoute) {
     setPreviewPublicRouteId(route.id);
-    setCommunityPreviewPlaces(
-      [...route.places]
-        .sort((left, right) => left.visitOrder - right.visitOrder)
-        .map((place) => ({
-          contentId: place.contentId,
-          title: place.title,
-          category: place.category,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-          imageUrl: place.imageUrl,
-          dataLanguage: place.dataLanguage,
-          stayMinutes: place.stayMinutes,
-        })),
-    );
+    setCommunityPreviewPlaces(toRouteDraftPlaces(route));
   }
 
   async function copyPublicRoute(routeId: number) {
@@ -1658,7 +1713,7 @@ export default function Home() {
     }
   }
 
-  function openPopularPlace(place: PopularPlace) {
+  function openCommunityPlace(place: RouteDraftPlace) {
     closeCommunity();
     void openPlaceDetail({
       contentId: place.contentId,
@@ -1764,7 +1819,9 @@ export default function Home() {
     setIsRoutePlannerOpen(false);
     setIsCommunityOpen(false);
     setPreviewPublicRouteId(null);
+    setSharedCommunityRouteId(null);
     setCommunityPreviewPlaces(null);
+    clearSharedRouteQuery();
 
     if (window.kakao?.maps && mapRef.current) {
       mapRef.current.setCenter(
@@ -2639,9 +2696,10 @@ export default function Home() {
               popularPlaces={popularPlaces}
               routes={publicRoutes}
               selectedRouteId={previewPublicRouteId}
+              initialDetailRouteId={sharedCommunityRouteId}
               onClose={closeCommunity}
               onCopyRoute={(routeId) => void copyPublicRoute(routeId)}
-              onOpenPlace={openPopularPlace}
+              onOpenPlace={openCommunityPlace}
               onPreviewRoute={previewPublicRoute}
               onRefresh={() => void loadCommunity()}
             />

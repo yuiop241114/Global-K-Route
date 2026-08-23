@@ -1,6 +1,8 @@
 package com.contest.kroute.route.repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
 
@@ -49,6 +51,36 @@ public class PopularityRepository {
 				.getResultList();
 
 		return rows.stream().map(this::toResponse).toList();
+	}
+
+	public Map<String, Long> findSaveCountsByContentIds(List<String> contentIds) {
+		if (contentIds.isEmpty()) {
+			return Map.of();
+		}
+
+		String sql = """
+				SELECT place_data.content_id, COUNT(DISTINCT place_data.user_id) AS save_count
+				FROM (
+				    SELECT sp.user_id, sp.content_id
+				    FROM saved_places sp
+				    UNION ALL
+				    SELECT tr.user_id, rp.content_id
+				    FROM route_places rp
+				    JOIN travel_routes tr ON tr.id = rp.route_id
+				) place_data
+				WHERE place_data.content_id IN (:contentIds)
+				GROUP BY place_data.content_id
+				""";
+
+		@SuppressWarnings("unchecked")
+		List<Object[]> rows = entityManager.createNativeQuery(sql)
+				.setParameter("contentIds", contentIds)
+				.getResultList();
+
+		return rows.stream().collect(Collectors.toMap(
+				row -> (String) row[0],
+				row -> ((Number) row[1]).longValue()
+		));
 	}
 
 	private PopularPlaceResponse toResponse(Object[] row) {

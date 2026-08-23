@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import com.contest.kroute.auth.repository.UserAccountRepository;
 import com.contest.kroute.route.domain.RoutePlace;
 import com.contest.kroute.route.domain.TravelRoute;
 import com.contest.kroute.route.domain.RouteTransportMode;
+import com.contest.kroute.route.dto.PublicRouteResponse;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.repository.PopularityRepository;
 import com.contest.kroute.route.repository.RoutePlaceRepository;
@@ -41,6 +43,42 @@ class CommunityRouteServiceTest {
 
 	@InjectMocks
 	private CommunityRouteService communityRouteService;
+
+	@Test
+	void returnsPublicRouteWithPlaceSaveCounts() {
+		UserAccount sourceUser = new UserAccount("source", "source@example.com", "password-hash");
+		TravelRoute sourceRoute = new TravelRoute(sourceUser, "Seoul day trip");
+		sourceRoute.changeVisibility(true);
+		RoutePlace sourcePlace = new RoutePlace(
+				sourceRoute,
+				"1001",
+				"Palace",
+				"tourist_attraction",
+				"Seoul, Korea",
+				37.5665,
+				126.978,
+				null,
+				"ko",
+				1,
+				60
+		);
+
+		when(routeRepository.findByIdAndPublicRouteTrue(10L)).thenReturn(Optional.of(sourceRoute));
+		when(routePlaceRepository.findAllByRouteIdOrderByVisitOrder(null)).thenReturn(List.of(sourcePlace));
+		when(popularityRepository.findSaveCountsByContentIds(List.of("1001")))
+				.thenReturn(Map.of("1001", 3L));
+		when(routeRepository.countBySourceRouteId(null)).thenReturn(2L);
+
+		PublicRouteResponse response = communityRouteService.findPublicRoute(10L);
+
+		assertThat(response.title()).isEqualTo("Seoul day trip");
+		assertThat(response.copyCount()).isEqualTo(2);
+		assertThat(response.places()).singleElement()
+				.satisfies(place -> {
+					assertThat(place.contentId()).isEqualTo("1001");
+					assertThat(place.saveCount()).isEqualTo(3);
+				});
+	}
 
 	@Test
 	void copiesPublicRouteAsIndependentMemberRoute() {
