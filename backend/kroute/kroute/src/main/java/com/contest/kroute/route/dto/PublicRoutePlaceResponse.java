@@ -12,6 +12,8 @@ public record PublicRoutePlaceResponse(
 		Double longitude,
 		String imageUrl,
 		String dataLanguage,
+		Integer areaCode,
+		Integer sigunguCode,
 		Integer visitOrder,
 		Integer stayMinutes,
 		long saveCount
@@ -27,6 +29,8 @@ public record PublicRoutePlaceResponse(
 				place.getLongitude(),
 				place.getImageUrl(),
 				place.getDataLanguage(),
+				place.getAreaCode(),
+				place.getSigunguCode(),
 				place.getVisitOrder(),
 				place.getStayMinutes(),
 				saveCount

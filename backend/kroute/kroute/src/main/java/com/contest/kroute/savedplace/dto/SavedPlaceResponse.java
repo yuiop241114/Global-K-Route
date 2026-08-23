@@ -14,6 +14,8 @@ public record SavedPlaceResponse(
 		Double longitude,
 		String imageUrl,
 		String dataLanguage,
+		Integer areaCode,
+		Integer sigunguCode,
 		Instant createdAt
 ) {
 	public static SavedPlaceResponse from(SavedPlace place) {
@@ -27,6 +29,8 @@ public record SavedPlaceResponse(
 				place.getLongitude(),
 				place.getImageUrl(),
 				place.getDataLanguage(),
+				place.getAreaCode(),
+				place.getSigunguCode(),
 				place.getCreatedAt()
 		);
 	}

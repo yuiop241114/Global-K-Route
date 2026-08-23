@@ -28,6 +28,8 @@ export type RouteDraftPlace = {
   longitude: number;
   imageUrl: string | null;
   dataLanguage: string;
+  areaCode: number | null;
+  sigunguCode: number | null;
   stayMinutes: number | null;
 };
 

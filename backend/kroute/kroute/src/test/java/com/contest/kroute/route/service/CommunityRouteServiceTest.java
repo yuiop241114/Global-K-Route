@@ -14,15 +14,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.contest.kroute.auth.domain.UserAccount;
 import com.contest.kroute.auth.repository.UserAccountRepository;
+import com.contest.kroute.common.PageResponse;
 import com.contest.kroute.route.domain.RoutePlace;
 import com.contest.kroute.route.domain.TravelRoute;
 import com.contest.kroute.route.domain.RouteTransportMode;
 import com.contest.kroute.route.dto.PublicRouteResponse;
+import com.contest.kroute.route.dto.PublicRouteSearchCriteria;
 import com.contest.kroute.route.dto.RouteResponse;
+import com.contest.kroute.route.repository.CommunityRouteQueryRepository;
 import com.contest.kroute.route.repository.PopularityRepository;
+import com.contest.kroute.route.repository.PublicRouteQueryResult;
 import com.contest.kroute.route.repository.RoutePlaceRepository;
 import com.contest.kroute.route.repository.TravelRouteRepository;
 
@@ -41,8 +46,58 @@ class CommunityRouteServiceTest {
 	@Mock
 	private PopularityRepository popularityRepository;
 
+	@Mock
+	private CommunityRouteQueryRepository communityRouteQueryRepository;
+
 	@InjectMocks
 	private CommunityRouteService communityRouteService;
+
+	@Test
+	void returnsFilteredPublicRoutePageWithBatchedMetrics() {
+		UserAccount sourceUser = new UserAccount("source", "source@example.com", "password-hash");
+		TravelRoute sourceRoute = new TravelRoute(sourceUser, "Seoul day trip");
+		sourceRoute.changeVisibility(true);
+		ReflectionTestUtils.setField(sourceRoute, "id", 10L);
+		RoutePlace sourcePlace = new RoutePlace(
+				sourceRoute,
+				"1001",
+				"Palace",
+				"tourist_attraction",
+				"Seoul, Korea",
+				37.5665,
+				126.978,
+				null,
+				"ko",
+				1,
+				1,
+				1,
+				60
+		);
+		PublicRouteSearchCriteria criteria = PublicRouteSearchCriteria.of(
+				"Seoul", 1, 1, 3, "popular", 0, 10
+		);
+
+		when(communityRouteQueryRepository.findPublicRouteIds(criteria))
+				.thenReturn(new PublicRouteQueryResult(List.of(10L), 1));
+		when(routeRepository.findAllById(List.of(10L))).thenReturn(List.of(sourceRoute));
+		when(routePlaceRepository.findAllByRouteIdInOrderByRouteIdAscVisitOrderAsc(List.of(10L)))
+				.thenReturn(List.of(sourcePlace));
+		when(popularityRepository.findSaveCountsByContentIds(List.of("1001")))
+				.thenReturn(Map.of("1001", 4L));
+		when(communityRouteQueryRepository.findCopyCounts(List.of(10L)))
+				.thenReturn(Map.of(10L, 2L));
+
+		PageResponse<PublicRouteResponse> response = communityRouteService.findPublicRoutes(criteria);
+
+		assertThat(response.totalElements()).isEqualTo(1);
+		assertThat(response.hasNext()).isFalse();
+		assertThat(response.content()).singleElement().satisfies(route -> {
+			assertThat(route.id()).isEqualTo(10L);
+			assertThat(route.copyCount()).isEqualTo(2);
+			assertThat(route.places()).singleElement()
+					.satisfies(place -> assertThat(place.saveCount()).isEqualTo(4));
+		});
+	}
 
 	@Test
 	void returnsPublicRouteWithPlaceSaveCounts() {
@@ -59,6 +114,8 @@ class CommunityRouteServiceTest {
 				126.978,
 				null,
 				"ko",
+				1,
+				1,
 				1,
 				60
 		);
@@ -102,6 +159,8 @@ class CommunityRouteServiceTest {
 				126.978,
 				null,
 				"ko",
+				1,
+				1,
 				1,
 				null
 		);

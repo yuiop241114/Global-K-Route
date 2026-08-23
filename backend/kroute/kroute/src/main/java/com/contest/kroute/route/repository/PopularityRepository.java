@@ -28,16 +28,20 @@ public class PopularityRepository {
 				       MAX(place_data.address) AS address,
 				       MAX(place_data.latitude) AS latitude,
 				       MAX(place_data.longitude) AS longitude,
-				       MAX(place_data.image_url) AS image_url,
-				       MAX(place_data.data_language) AS data_language,
-				       COUNT(DISTINCT place_data.user_id) AS save_count
+			       MAX(place_data.image_url) AS image_url,
+			       MAX(place_data.data_language) AS data_language,
+			       MAX(place_data.area_code) AS area_code,
+			       MAX(place_data.sigungu_code) AS sigungu_code,
+			       COUNT(DISTINCT place_data.user_id) AS save_count
 				FROM (
 				    SELECT sp.user_id, sp.content_id, sp.title, sp.category, sp.address,
-				           sp.latitude, sp.longitude, sp.image_url, sp.data_language
+			           sp.latitude, sp.longitude, sp.image_url, sp.data_language,
+			           sp.area_code, sp.sigungu_code
 				    FROM saved_places sp
 				    UNION ALL
 				    SELECT tr.user_id, rp.content_id, rp.title, rp.category, rp.address,
-				           rp.latitude, rp.longitude, rp.image_url, rp.data_language
+			           rp.latitude, rp.longitude, rp.image_url, rp.data_language,
+			           rp.area_code, rp.sigungu_code
 				    FROM route_places rp
 				    JOIN travel_routes tr ON tr.id = rp.route_id
 				) place_data
@@ -93,7 +97,9 @@ public class PopularityRepository {
 				((Number) row[5]).doubleValue(),
 				(String) row[6],
 				(String) row[7],
-				((Number) row[8]).longValue()
+				row[8] == null ? null : ((Number) row[8]).intValue(),
+				row[9] == null ? null : ((Number) row[9]).intValue(),
+				((Number) row[10]).longValue()
 		);
 	}
 }

@@ -59,6 +59,12 @@ public class SavedPlace {
 	@Column(name = "data_language", nullable = false, length = 10)
 	private String dataLanguage;
 
+	@Column(name = "area_code")
+	private Integer areaCode;
+
+	@Column(name = "sigungu_code")
+	private Integer sigunguCode;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -69,14 +75,15 @@ public class SavedPlace {
 	}
 
 	public SavedPlace(UserAccount user, String contentId, String title, String category, String address,
-			Double latitude, Double longitude, String imageUrl, String dataLanguage) {
+			Double latitude, Double longitude, String imageUrl, String dataLanguage, Integer areaCode,
+			Integer sigunguCode) {
 		this.user = user;
 		this.contentId = contentId;
-		updateSnapshot(title, category, address, latitude, longitude, imageUrl, dataLanguage);
+		updateSnapshot(title, category, address, latitude, longitude, imageUrl, dataLanguage, areaCode, sigunguCode);
 	}
 
 	public void updateSnapshot(String title, String category, String address, Double latitude, Double longitude,
-			String imageUrl, String dataLanguage) {
+			String imageUrl, String dataLanguage, Integer areaCode, Integer sigunguCode) {
 		this.title = title;
 		this.category = category;
 		this.address = address;
@@ -84,6 +91,8 @@ public class SavedPlace {
 		this.longitude = longitude;
 		this.imageUrl = imageUrl;
 		this.dataLanguage = dataLanguage;
+		this.areaCode = areaCode;
+		this.sigunguCode = sigunguCode;
 	}
 
 	@PrePersist
@@ -132,6 +141,14 @@ public class SavedPlace {
 
 	public String getDataLanguage() {
 		return dataLanguage;
+	}
+
+	public Integer getAreaCode() {
+		return areaCode;
+	}
+
+	public Integer getSigunguCode() {
+		return sigunguCode;
 	}
 
 	public Instant getCreatedAt() {

@@ -11,6 +11,7 @@ import {
   MapPin,
   Navigation,
   RefreshCw,
+  RotateCcw,
   Route as RouteIcon,
   Search,
   Share2,
@@ -36,6 +37,23 @@ export type PublicRoute = {
 
 export type PopularPlace = RouteDraftPlace & { saveCount: number };
 
+export type PublicRouteSort = "latest" | "popular" | "placeCount";
+export type RoutePlaceCountFilter = "all" | "oneToThree" | "fourToSix" | "sevenPlus";
+
+export type PublicRouteFilters = {
+  query: string;
+  areaCode: number | null;
+  sort: PublicRouteSort;
+  placeCount: RoutePlaceCountFilter;
+};
+
+export const DEFAULT_PUBLIC_ROUTE_FILTERS: PublicRouteFilters = {
+  query: "",
+  areaCode: null,
+  sort: "latest",
+  placeCount: "all",
+};
+
 type CommunityBoardProps = {
   language: "ko" | "en";
   routes: PublicRoute[];
@@ -44,15 +62,39 @@ type CommunityBoardProps = {
   initialDetailRouteId: number | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLoadingMore: boolean;
+  totalRoutes: number;
+  hasNextPage: boolean;
+  filters: PublicRouteFilters;
   error: string | null;
   onClose: () => void;
   onRefresh: () => void;
   onPreviewRoute: (route: PublicRoute) => void;
   onCopyRoute: (routeId: number) => void;
   onOpenPlace: (place: RouteDraftPlace) => void;
+  onFiltersChange: (filters: PublicRouteFilters) => void;
+  onLoadMore: () => void;
 };
 
-type RouteSort = "latest" | "popular" | "placeCount";
+const ROUTE_AREAS = [
+  { code: 1, ko: "서울", en: "Seoul" },
+  { code: 2, ko: "인천", en: "Incheon" },
+  { code: 3, ko: "대전", en: "Daejeon" },
+  { code: 4, ko: "대구", en: "Daegu" },
+  { code: 5, ko: "광주", en: "Gwangju" },
+  { code: 6, ko: "부산", en: "Busan" },
+  { code: 7, ko: "울산", en: "Ulsan" },
+  { code: 8, ko: "세종", en: "Sejong" },
+  { code: 31, ko: "경기", en: "Gyeonggi" },
+  { code: 32, ko: "강원", en: "Gangwon" },
+  { code: 33, ko: "충북", en: "Chungbuk" },
+  { code: 34, ko: "충남", en: "Chungnam" },
+  { code: 35, ko: "경북", en: "Gyeongbuk" },
+  { code: 36, ko: "경남", en: "Gyeongnam" },
+  { code: 37, ko: "전북", en: "Jeonbuk" },
+  { code: 38, ko: "전남", en: "Jeonnam" },
+  { code: 39, ko: "제주", en: "Jeju" },
+] as const;
 
 const COPY_TEXT = {
   ko: {
@@ -76,8 +118,19 @@ const COPY_TEXT = {
     close: "닫기",
     backToRoutes: "공개 코스 목록으로 돌아가기",
     search: "코스 검색",
-    searchPlaceholder: "제목, 장소 또는 주소 검색",
+    searchPlaceholder: "코스 제목 검색",
     sort: "정렬",
+    region: "지역",
+    allRegions: "전체 지역",
+    placeCountFilter: "장소 수",
+    allPlaceCounts: "전체 장소 수",
+    oneToThree: "1~3개",
+    fourToSix: "4~6개",
+    sevenPlus: "7개 이상",
+    clearFilters: "필터 초기화",
+    resultCount: "개 코스",
+    loadMore: "더 보기",
+    loadingMore: "추가로 불러오는 중...",
     latest: "최신순",
     mostPopular: "인기순",
     mostPlaces: "장소 많은 순",
@@ -121,8 +174,19 @@ const COPY_TEXT = {
     close: "Close",
     backToRoutes: "Back to public routes",
     search: "Search routes",
-    searchPlaceholder: "Search title, place, or address",
+    searchPlaceholder: "Search route titles",
     sort: "Sort routes",
+    region: "Region",
+    allRegions: "All regions",
+    placeCountFilter: "Place count",
+    allPlaceCounts: "All place counts",
+    oneToThree: "1-3 places",
+    fourToSix: "4-6 places",
+    sevenPlus: "7+ places",
+    clearFilters: "Clear filters",
+    resultCount: "routes",
+    loadMore: "Load more",
+    loadingMore: "Loading more...",
     latest: "Latest",
     mostPopular: "Most popular",
     mostPlaces: "Most places",
@@ -189,19 +253,32 @@ export default function CommunityBoard({
   initialDetailRouteId,
   isAuthenticated,
   isLoading,
+  isLoadingMore,
+  totalRoutes,
+  hasNextPage,
+  filters,
   error,
   onClose,
   onRefresh,
   onPreviewRoute,
   onCopyRoute,
   onOpenPlace,
+  onFiltersChange,
+  onLoadMore,
 }: CommunityBoardProps) {
   const [tab, setTab] = useState<"routes" | "popular">("routes");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [routeSort, setRouteSort] = useState<RouteSort>("latest");
+  const [searchQuery, setSearchQuery] = useState(filters.query);
   const [detailRouteId, setDetailRouteId] = useState<number | null>(null);
   const [copiedShareRouteId, setCopiedShareRouteId] = useState<number | null>(null);
   const copy = COPY_TEXT[language];
+
+  useEffect(() => {
+    if (searchQuery.trim() === filters.query) return;
+    const timer = window.setTimeout(() => {
+      onFiltersChange({ ...filters, query: searchQuery.trim() });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [filters, onFiltersChange, searchQuery]);
 
   useEffect(() => {
     if (
@@ -218,31 +295,11 @@ export default function CommunityBoard({
     return () => window.clearTimeout(timer);
   }, [initialDetailRouteId, routes]);
 
-  const visibleRoutes = useMemo(() => {
-    const locale = language === "ko" ? "ko-KR" : "en-US";
-    const query = searchQuery.trim().toLocaleLowerCase(locale);
-    const filtered = query
-      ? routes.filter((route) =>
-          [route.title, ...route.places.flatMap((place) => [place.title, place.address])]
-            .join(" ")
-            .toLocaleLowerCase(locale)
-            .includes(query),
-        )
-      : routes;
-
-    return [...filtered].sort((left, right) => {
-      if (routeSort === "popular") {
-        return right.copyCount - left.copyCount || right.id - left.id;
-      }
-      if (routeSort === "placeCount") {
-        return right.places.length - left.places.length || right.copyCount - left.copyCount;
-      }
-      return (
-        new Date(right.publishedAt || right.updatedAt).getTime() -
-        new Date(left.publishedAt || left.updatedAt).getTime()
-      );
-    });
-  }, [language, routeSort, routes, searchQuery]);
+  const hasActiveFilters =
+    filters.query.length > 0 ||
+    filters.areaCode !== null ||
+    filters.placeCount !== "all" ||
+    filters.sort !== "latest";
 
   const detailRoute =
     detailRouteId === null
@@ -346,7 +403,7 @@ export default function CommunityBoard({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        {isLoading ? (
+        {isLoading && (tab !== "routes" || detailRoute) ? (
           <div className="flex min-h-48 items-center justify-center text-sm text-[#667085]">{copy.loading}</div>
         ) : null}
 
@@ -354,9 +411,9 @@ export default function CommunityBoard({
           <p className="border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]" role="alert">{error}</p>
         ) : null}
 
-        {!isLoading && !error && tab === "routes" && !detailRoute ? (
+        {!error && tab === "routes" && !detailRoute ? (
           <section aria-label={copy.routes}>
-            <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px]">
+            <div className="mb-4 space-y-2">
               <label className="relative block">
                 <span className="sr-only">{copy.search}</span>
                 <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#667085]" size={17} />
@@ -368,27 +425,61 @@ export default function CommunityBoard({
                   onChange={(event) => setSearchQuery(event.target.value)}
                 />
               </label>
-              <label>
-                <span className="sr-only">{copy.sort}</span>
-                <select
-                  className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
-                  value={routeSort}
-                  onChange={(event) => setRouteSort(event.target.value as RouteSort)}
-                >
-                  <option value="latest">{copy.latest}</option>
-                  <option value="popular">{copy.mostPopular}</option>
-                  <option value="placeCount">{copy.mostPlaces}</option>
-                </select>
-              </label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <label>
+                  <span className="sr-only">{copy.region}</span>
+                  <select
+                    className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                    value={filters.areaCode ?? ""}
+                    onChange={(event) => onFiltersChange({ ...filters, areaCode: event.target.value ? Number(event.target.value) : null })}
+                  >
+                    <option value="">{copy.allRegions}</option>
+                    {ROUTE_AREAS.map((area) => <option key={area.code} value={area.code}>{area[language]}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span className="sr-only">{copy.placeCountFilter}</span>
+                  <select
+                    className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                    value={filters.placeCount}
+                    onChange={(event) => onFiltersChange({ ...filters, placeCount: event.target.value as RoutePlaceCountFilter })}
+                  >
+                    <option value="all">{copy.allPlaceCounts}</option>
+                    <option value="oneToThree">{copy.oneToThree}</option>
+                    <option value="fourToSix">{copy.fourToSix}</option>
+                    <option value="sevenPlus">{copy.sevenPlus}</option>
+                  </select>
+                </label>
+                <label className="col-span-2 sm:col-span-1">
+                  <span className="sr-only">{copy.sort}</span>
+                  <select
+                    className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                    value={filters.sort}
+                    onChange={(event) => onFiltersChange({ ...filters, sort: event.target.value as PublicRouteSort })}
+                  >
+                    <option value="latest">{copy.latest}</option>
+                    <option value="popular">{copy.mostPopular}</option>
+                    <option value="placeCount">{copy.mostPlaces}</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex min-h-9 items-center justify-between gap-3 border-b border-[#e1e7ef] pb-2">
+                <span className="text-xs font-semibold text-[#667085]">{totalRoutes} {copy.resultCount}</span>
+                {hasActiveFilters ? (
+                  <button className="flex min-h-9 items-center gap-1 text-xs font-semibold text-[#475467] hover:text-[#101828] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]" type="button" onClick={() => { setSearchQuery(""); onFiltersChange(DEFAULT_PUBLIC_ROUTE_FILTERS); }}>
+                    <RotateCcw aria-hidden="true" size={15} />{copy.clearFilters}
+                  </button>
+                ) : null}
+              </div>
             </div>
 
-            {routes.length === 0 ? (
-              <div className="border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-8 text-center text-sm text-[#667085]">{copy.emptyRoutes}</div>
-            ) : visibleRoutes.length === 0 ? (
-              <div className="border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-8 text-center text-sm text-[#667085]">{copy.noSearchResults}</div>
+            {isLoading ? (
+              <div className="flex min-h-48 items-center justify-center text-sm text-[#667085]">{copy.loading}</div>
+            ) : routes.length === 0 ? (
+              <div className="border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-8 text-center text-sm text-[#667085]">{hasActiveFilters ? copy.noSearchResults : copy.emptyRoutes}</div>
             ) : (
               <div className="space-y-3">
-                {visibleRoutes.map((route) => {
+                {routes.map((route) => {
                   const orderedPlaces = [...route.places].sort((left, right) => left.visitOrder - right.visitOrder);
                   const previewImage = orderedPlaces.find((place) => place.imageUrl)?.imageUrl;
                   return (
@@ -433,6 +524,11 @@ export default function CommunityBoard({
                     </article>
                   );
                 })}
+                {hasNextPage ? (
+                  <button className="flex min-h-11 w-full items-center justify-center border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] transition hover:border-[#98a2b3] hover:bg-[#f8fafc] disabled:cursor-wait disabled:text-[#98a2b3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]" disabled={isLoadingMore} type="button" onClick={onLoadMore}>
+                    {isLoadingMore ? copy.loadingMore : copy.loadMore}
+                  </button>
+                ) : null}
               </div>
             )}
           </section>

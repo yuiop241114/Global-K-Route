@@ -17,6 +17,8 @@ public record RoutePlaceRequest(
 		@NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
 		@Size(max = 2048) String imageUrl,
 		@NotBlank @Size(max = 10) String dataLanguage,
+		@Min(1) Integer areaCode,
+		@Min(1) Integer sigunguCode,
 		@Min(0) @Max(1440) Integer stayMinutes
 ) {
 }

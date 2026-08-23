@@ -56,6 +56,12 @@ public class RoutePlace {
 	@Column(name = "data_language", nullable = false, length = 10)
 	private String dataLanguage;
 
+	@Column(name = "area_code")
+	private Integer areaCode;
+
+	@Column(name = "sigungu_code")
+	private Integer sigunguCode;
+
 	@Column(name = "visit_order", nullable = false)
 	private Integer visitOrder;
 
@@ -69,8 +75,8 @@ public class RoutePlace {
 	}
 
 	public RoutePlace(TravelRoute route, String contentId, String title, String category, String address,
-			Double latitude, Double longitude, String imageUrl, String dataLanguage, Integer visitOrder,
-			Integer stayMinutes) {
+			Double latitude, Double longitude, String imageUrl, String dataLanguage, Integer areaCode,
+			Integer sigunguCode, Integer visitOrder, Integer stayMinutes) {
 		this.route = route;
 		this.contentId = contentId;
 		this.title = title;
@@ -80,6 +86,8 @@ public class RoutePlace {
 		this.longitude = longitude;
 		this.imageUrl = imageUrl;
 		this.dataLanguage = dataLanguage;
+		this.areaCode = areaCode;
+		this.sigunguCode = sigunguCode;
 		this.visitOrder = visitOrder;
 		this.stayMinutes = stayMinutes;
 	}
@@ -91,6 +99,10 @@ public class RoutePlace {
 
 	public Long getId() {
 		return id;
+	}
+
+	public Long getRouteId() {
+		return route.getId();
 	}
 
 	public String getContentId() {
@@ -123,6 +135,14 @@ public class RoutePlace {
 
 	public String getDataLanguage() {
 		return dataLanguage;
+	}
+
+	public Integer getAreaCode() {
+		return areaCode;
+	}
+
+	public Integer getSigunguCode() {
+		return sigunguCode;
 	}
 
 	public Integer getVisitOrder() {

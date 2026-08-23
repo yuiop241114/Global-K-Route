@@ -339,7 +339,9 @@ public class TourApiClient {
 				parseDouble(item.path("dist").asText(null))
 						.map(Double::intValue)
 						.orElse(0),
-				resolveImageUrl(item)
+				resolveImageUrl(item),
+				parseInteger(item.path("areacode").asText(null)).orElse(null),
+				parseInteger(item.path("sigungucode").asText(null)).orElse(null)
 		));
 	}
 
@@ -598,6 +600,17 @@ public class TourApiClient {
 		}
 		try {
 			return Optional.of(Double.parseDouble(value));
+		} catch (NumberFormatException exception) {
+			return Optional.empty();
+		}
+	}
+
+	private Optional<Integer> parseInteger(String value) {
+		if (value == null || value.isBlank()) {
+			return Optional.empty();
+		}
+		try {
+			return Optional.of(Integer.parseInt(value));
 		} catch (NumberFormatException exception) {
 			return Optional.empty();
 		}

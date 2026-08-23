@@ -43,7 +43,9 @@ class SavedPlaceServiceTest {
 				37.5665,
 				126.978,
 				"https://images.example.com/place.jpg",
-				"EN"
+				"EN",
+				1,
+				1
 		);
 		UserAccount user = new UserAccount("traveler", "traveler@example.com", "password-hash");
 
@@ -58,6 +60,7 @@ class SavedPlaceServiceTest {
 		assertThat(response.contentId()).isEqualTo("1001");
 		assertThat(response.title()).isEqualTo("Seoul Museum");
 		assertThat(response.dataLanguage()).isEqualTo("en");
+		assertThat(response.areaCode()).isEqualTo(1);
 		verify(userAccountRepository).getReferenceById(userId);
 		verify(savedPlaceRepository).save(any(SavedPlace.class));
 	}

@@ -121,6 +121,8 @@ public class TravelRouteService {
 				request.longitude(),
 				normalizeNullable(request.imageUrl()),
 				normalizeRequired(request.dataLanguage()).toLowerCase(),
+				request.areaCode(),
+				request.sigunguCode(),
 				visitOrder,
 				request.stayMinutes()
 		);

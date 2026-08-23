@@ -42,7 +42,9 @@ public class SavedPlaceService {
 				request.latitude(),
 				request.longitude(),
 				normalizeNullable(request.imageUrl()),
-				request.dataLanguage().trim().toLowerCase()
+				request.dataLanguage().trim().toLowerCase(),
+				request.areaCode(),
+				request.sigunguCode()
 		);
 		return SavedPlaceResponse.from(savedPlaceRepository.save(place));
 	}
@@ -63,7 +65,9 @@ public class SavedPlaceService {
 				request.latitude(),
 				request.longitude(),
 				normalizeNullable(request.imageUrl()),
-				request.dataLanguage().trim().toLowerCase()
+				request.dataLanguage().trim().toLowerCase(),
+				request.areaCode(),
+				request.sigunguCode()
 		);
 	}
 

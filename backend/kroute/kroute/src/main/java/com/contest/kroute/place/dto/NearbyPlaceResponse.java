@@ -8,6 +8,8 @@ public record NearbyPlaceResponse(
 		double latitude,
 		double longitude,
 		int distanceMeters,
-		String imageUrl
+		String imageUrl,
+		Integer areaCode,
+		Integer sigunguCode
 ) {
 }

@@ -9,6 +9,8 @@ public record PopularPlaceResponse(
 		Double longitude,
 		String imageUrl,
 		String dataLanguage,
+		Integer areaCode,
+		Integer sigunguCode,
 		long saveCount
 ) {
 }

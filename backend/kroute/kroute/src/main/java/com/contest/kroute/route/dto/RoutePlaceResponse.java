@@ -12,6 +12,8 @@ public record RoutePlaceResponse(
 		Double longitude,
 		String imageUrl,
 		String dataLanguage,
+		Integer areaCode,
+		Integer sigunguCode,
 		Integer visitOrder,
 		Integer stayMinutes
 ) {
@@ -26,6 +28,8 @@ public record RoutePlaceResponse(
 				place.getLongitude(),
 				place.getImageUrl(),
 				place.getDataLanguage(),
+				place.getAreaCode(),
+				place.getSigunguCode(),
 				place.getVisitOrder(),
 				place.getStayMinutes()
 		);

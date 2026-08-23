@@ -118,6 +118,8 @@ class TravelRouteServiceTest {
 				126.978,
 				null,
 				"ko",
+				1,
+				1,
 				null
 		);
 	}

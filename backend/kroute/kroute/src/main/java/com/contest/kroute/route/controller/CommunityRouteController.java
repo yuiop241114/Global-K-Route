@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.contest.kroute.auth.security.UserPrincipal;
 import com.contest.kroute.common.ApiResponse;
+import com.contest.kroute.common.PageResponse;
 import com.contest.kroute.route.dto.PopularPlaceResponse;
+import com.contest.kroute.route.dto.PublicRouteSearchCriteria;
 import com.contest.kroute.route.dto.PublicRouteResponse;
 import com.contest.kroute.route.dto.RouteResponse;
 import com.contest.kroute.route.service.CommunityRouteService;
@@ -30,7 +32,31 @@ public class CommunityRouteController {
 
 	@GetMapping("/routes")
 	public ApiResponse<List<PublicRouteResponse>> findPublicRoutes() {
-		return ApiResponse.ok(communityRouteService.findPublicRoutes());
+		PublicRouteSearchCriteria criteria = PublicRouteSearchCriteria.of(
+				null, null, null, null, "latest", 0, 30
+		);
+		return ApiResponse.ok(communityRouteService.findPublicRoutes(criteria).content());
+	}
+
+	@GetMapping("/routes/search")
+	public ApiResponse<PageResponse<PublicRouteResponse>> searchPublicRoutes(
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) Integer areaCode,
+			@RequestParam(required = false) Integer minPlaces,
+			@RequestParam(required = false) Integer maxPlaces,
+			@RequestParam(defaultValue = "latest") String sort,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size) {
+		PublicRouteSearchCriteria criteria = PublicRouteSearchCriteria.of(
+				q,
+				areaCode,
+				minPlaces,
+				maxPlaces,
+				sort,
+				page,
+				size
+		);
+		return ApiResponse.ok(communityRouteService.findPublicRoutes(criteria));
 	}
 
 	@GetMapping("/routes/{routeId}")

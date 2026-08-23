@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import AccountAccess, { type AccountUser } from "@/app/components/AccountAccess";
 import CommunityBoard, {
+  DEFAULT_PUBLIC_ROUTE_FILTERS,
   type PopularPlace,
+  type PublicRouteFilters,
   type PublicRoute,
 } from "@/app/components/CommunityBoard";
 import RoutePlannerPanel, {
@@ -57,6 +59,8 @@ type Place = {
   longitude: number;
   distanceMeters: number;
   imageUrl: string | null;
+  areaCode: number | null;
+  sigunguCode: number | null;
 };
 
 type SavedPlace = {
@@ -69,6 +73,8 @@ type SavedPlace = {
   longitude: number;
   imageUrl: string | null;
   dataLanguage: string;
+  areaCode: number | null;
+  sigunguCode: number | null;
   createdAt: string;
 };
 
@@ -127,6 +133,15 @@ type ApiResponse<T> = {
   data: T;
   message: string | null;
   timestamp: string;
+};
+
+type PageData<T> = {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
 };
 
 type WalkingRoutePath = WalkingRouteSummary & {
@@ -991,7 +1006,9 @@ function isRouteDraftPlace(value: unknown): value is RouteDraftPlace {
     typeof place.address === "string" &&
     typeof place.latitude === "number" &&
     typeof place.longitude === "number" &&
-    typeof place.dataLanguage === "string"
+    typeof place.dataLanguage === "string" &&
+    (place.areaCode === undefined || place.areaCode === null || typeof place.areaCode === "number") &&
+    (place.sigunguCode === undefined || place.sigunguCode === null || typeof place.sigunguCode === "number")
   );
 }
 
@@ -1007,6 +1024,8 @@ function toRouteDraftPlaces(route: PublicRoute): RouteDraftPlace[] {
       longitude: place.longitude,
       imageUrl: place.imageUrl,
       dataLanguage: place.dataLanguage,
+      areaCode: place.areaCode,
+      sigunguCode: place.sigunguCode,
       stayMinutes: place.stayMinutes,
     }));
 }
@@ -1049,6 +1068,13 @@ export default function Home() {
   const [popularPlaces, setPopularPlaces] = useState<PopularPlace[]>([]);
   const [isCommunityOpen, setIsCommunityOpen] = useState(false);
   const [isCommunityLoading, setIsCommunityLoading] = useState(false);
+  const [isCommunityLoadingMore, setIsCommunityLoadingMore] = useState(false);
+  const [communityFilters, setCommunityFilters] = useState<PublicRouteFilters>(() => ({
+    ...DEFAULT_PUBLIC_ROUTE_FILTERS,
+  }));
+  const [communityPage, setCommunityPage] = useState(0);
+  const [communityTotalRoutes, setCommunityTotalRoutes] = useState(0);
+  const [communityHasNextPage, setCommunityHasNextPage] = useState(false);
   const [communityError, setCommunityError] = useState<string | null>(null);
   const [previewPublicRouteId, setPreviewPublicRouteId] = useState<number | null>(
     null,
@@ -1097,6 +1123,7 @@ export default function Home() {
   const detailRequestIdRef = useRef(0);
   const savedPlacesRequestIdRef = useRef(0);
   const routesRequestIdRef = useRef(0);
+  const communityRequestIdRef = useRef(0);
   const sharedRouteHandledRef = useRef(false);
 
   const apiBaseUrl = useMemo(() => {
@@ -1143,26 +1170,87 @@ export default function Home() {
     [popularPlaces],
   );
 
-  const loadCommunity = useCallback(async () => {
-    setIsCommunityLoading(true);
+  const loadCommunity = useCallback(async (
+    filters: PublicRouteFilters,
+    page = 0,
+    append = false,
+    refreshPopular = false,
+  ) => {
+    const requestId = communityRequestIdRef.current + 1;
+    communityRequestIdRef.current = requestId;
+    if (append) setIsCommunityLoadingMore(true);
+    else setIsCommunityLoading(true);
     setCommunityError(null);
     try {
+      const params = new URLSearchParams({
+        sort: filters.sort,
+        page: page.toString(),
+        size: "10",
+      });
+      if (filters.query) params.set("q", filters.query);
+      if (filters.areaCode !== null) params.set("areaCode", filters.areaCode.toString());
+      if (filters.placeCount === "oneToThree") {
+        params.set("minPlaces", "1");
+        params.set("maxPlaces", "3");
+      } else if (filters.placeCount === "fourToSix") {
+        params.set("minPlaces", "4");
+        params.set("maxPlaces", "6");
+      } else if (filters.placeCount === "sevenPlus") {
+        params.set("minPlaces", "7");
+      }
+
       const [routeResponse, popularResponse] = await Promise.all([
-        backendApi<PublicRoute[]>("/public/routes"),
-        backendApi<PopularPlace[]>("/public/places/popular?limit=12"),
+        backendApi<PageData<PublicRoute>>(`/public/routes/search?${params.toString()}`),
+        refreshPopular
+          ? backendApi<PopularPlace[]>("/public/places/popular?limit=12")
+          : Promise.resolve(null),
       ]);
-      setPublicRoutes(routeResponse.data);
-      setPopularPlaces(popularResponse.data);
+      if (communityRequestIdRef.current !== requestId) return;
+      setPublicRoutes((previous) => {
+        if (!append) return routeResponse.data.content;
+        const existingIds = new Set(previous.map((route) => route.id));
+        return [
+          ...previous,
+          ...routeResponse.data.content.filter((route) => !existingIds.has(route.id)),
+        ];
+      });
+      setCommunityPage(routeResponse.data.page);
+      setCommunityTotalRoutes(routeResponse.data.totalElements);
+      setCommunityHasNextPage(routeResponse.data.hasNext);
+      if (popularResponse) setPopularPlaces(popularResponse.data);
     } catch (error) {
+      if (communityRequestIdRef.current !== requestId) return;
       setCommunityError(
         error instanceof Error
           ? error.message
           : "Community data could not be loaded",
       );
     } finally {
-      setIsCommunityLoading(false);
+      if (communityRequestIdRef.current === requestId) {
+        setIsCommunityLoading(false);
+        setIsCommunityLoadingMore(false);
+      }
     }
   }, []);
+
+  const changeCommunityFilters = useCallback((nextFilters: PublicRouteFilters) => {
+    setCommunityFilters(nextFilters);
+    setPreviewPublicRouteId(null);
+    setSharedCommunityRouteId(null);
+    setCommunityPreviewPlaces(null);
+    void loadCommunity(nextFilters, 0, false, false);
+  }, [loadCommunity]);
+
+  const loadMoreCommunityRoutes = useCallback(() => {
+    if (isCommunityLoadingMore || !communityHasNextPage) return;
+    void loadCommunity(communityFilters, communityPage + 1, true, false);
+  }, [
+    communityFilters,
+    communityHasNextPage,
+    communityPage,
+    isCommunityLoadingMore,
+    loadCommunity,
+  ]);
 
   useEffect(() => {
     if (sharedRouteHandledRef.current) return;
@@ -1187,6 +1275,9 @@ export default function Home() {
         .then(([routeResponse, popularResponse]) => {
           setPublicRoutes([routeResponse.data]);
           setPopularPlaces(popularResponse.data);
+          setCommunityPage(0);
+          setCommunityTotalRoutes(1);
+          setCommunityHasNextPage(false);
           setCommunityPreviewPlaces(toRouteDraftPlaces(routeResponse.data));
         })
         .catch((error) => {
@@ -1278,7 +1369,14 @@ export default function Home() {
           }
           if (Array.isArray(parsed.places)) {
             setRouteDraftPlaces(
-              parsed.places.filter(isRouteDraftPlace).slice(0, MAX_ROUTE_PLACES),
+              parsed.places
+                .filter(isRouteDraftPlace)
+                .slice(0, MAX_ROUTE_PLACES)
+                .map((place) => ({
+                  ...place,
+                  areaCode: place.areaCode ?? null,
+                  sigunguCode: place.sigunguCode ?? null,
+                })),
             );
           }
         }
@@ -1520,6 +1618,8 @@ export default function Home() {
       longitude: savedPlace.longitude,
       distanceMeters: 0,
       imageUrl: savedPlace.imageUrl,
+      areaCode: savedPlace.areaCode,
+      sigunguCode: savedPlace.sigunguCode,
     };
   }
 
@@ -1536,6 +1636,8 @@ export default function Home() {
       longitude: detail?.longitude ?? place.longitude,
       imageUrl: detail?.primaryImageUrl ?? place.imageUrl,
       dataLanguage: detail?.dataLanguage ?? language,
+      areaCode: place.areaCode,
+      sigunguCode: place.sigunguCode,
       stayMinutes: null,
     };
   }
@@ -1629,6 +1731,8 @@ export default function Home() {
           longitude: place.longitude,
           imageUrl: place.imageUrl,
           dataLanguage: place.dataLanguage,
+          areaCode: place.areaCode,
+          sigunguCode: place.sigunguCode,
           stayMinutes: place.stayMinutes,
         })),
     );
@@ -1677,7 +1781,7 @@ export default function Home() {
       );
       setRoutes((previous) => [response.data, ...previous]);
       openRoute(response.data);
-      void loadCommunity();
+      void loadCommunity(communityFilters, 0, false, true);
     } catch (error) {
       setCommunityError(
         error instanceof Error ? error.message : messages.routeCopyError,
@@ -1705,7 +1809,7 @@ export default function Home() {
           item.id === response.data.id ? response.data : item,
         ),
       );
-      void loadCommunity();
+      void loadCommunity(communityFilters, 0, false, true);
     } catch (error) {
       setRouteError(
         error instanceof Error ? error.message : messages.routeSaveError,
@@ -1724,6 +1828,8 @@ export default function Home() {
       longitude: place.longitude,
       distanceMeters: 0,
       imageUrl: place.imageUrl,
+      areaCode: place.areaCode,
+      sigunguCode: place.sigunguCode,
     });
   }
 
@@ -1786,6 +1892,8 @@ export default function Home() {
           longitude: detail?.longitude ?? place.longitude,
           imageUrl: detail?.primaryImageUrl ?? place.imageUrl,
           dataLanguage: detail?.dataLanguage ?? language,
+          areaCode: place.areaCode,
+          sigunguCode: place.sigunguCode,
         }),
       });
       setSavedPlaces((previous) => [
@@ -2123,6 +2231,8 @@ export default function Home() {
           longitude: routePlace.longitude,
           distanceMeters: 0,
           imageUrl: routePlace.imageUrl,
+          areaCode: routePlace.areaCode,
+          sigunguCode: routePlace.sigunguCode,
         });
       });
 
@@ -2637,7 +2747,7 @@ export default function Home() {
                   setIsSavedPlacesOpen(false);
                   setIsRoutePlannerOpen(false);
                   setIsCommunityOpen(true);
-                  void loadCommunity();
+                  void loadCommunity(communityFilters, 0, false, true);
                 }}
               >
                 <Users aria-hidden="true" size={17} />
@@ -2690,18 +2800,24 @@ export default function Home() {
           {isCommunityOpen ? (
             <CommunityBoard
               error={communityError}
+              filters={communityFilters}
+              hasNextPage={communityHasNextPage}
               isAuthenticated={currentUser !== null}
               isLoading={isCommunityLoading}
+              isLoadingMore={isCommunityLoadingMore}
               language={uiLanguage}
               popularPlaces={popularPlaces}
               routes={publicRoutes}
               selectedRouteId={previewPublicRouteId}
+              totalRoutes={communityTotalRoutes}
               initialDetailRouteId={sharedCommunityRouteId}
               onClose={closeCommunity}
               onCopyRoute={(routeId) => void copyPublicRoute(routeId)}
+              onFiltersChange={changeCommunityFilters}
+              onLoadMore={loadMoreCommunityRoutes}
               onOpenPlace={openCommunityPlace}
               onPreviewRoute={previewPublicRoute}
-              onRefresh={() => void loadCommunity()}
+              onRefresh={() => void loadCommunity(communityFilters, 0, false, true)}
             />
           ) : null}
 
