@@ -55,7 +55,7 @@ public class CommunityRouteService {
 		Map<Long, TravelRoute> routesById = routeRepository.findAllById(queryResult.routeIds()).stream()
 				.collect(Collectors.toMap(TravelRoute::getId, Function.identity()));
 		List<RoutePlace> allPlaces = routePlaceRepository
-				.findAllByRouteIdInOrderByRouteIdAscVisitOrderAsc(queryResult.routeIds());
+				.findAllByRouteIdsOrderByRouteAndVisitOrder(queryResult.routeIds());
 		Map<Long, List<RoutePlace>> placesByRouteId = allPlaces.stream()
 				.collect(Collectors.groupingBy(RoutePlace::getRouteId));
 		Map<String, Long> saveCounts = popularityRepository.findSaveCountsByContentIds(
@@ -92,7 +92,7 @@ public class CommunityRouteService {
 		copiedRoute.setSourceRoute(source);
 		routeRepository.save(copiedRoute);
 
-		List<RoutePlace> copiedPlaces = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(source.getId()).stream()
+		List<RoutePlace> copiedPlaces = routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(source.getId()).stream()
 				.map(place -> copyPlace(copiedRoute, place))
 				.toList();
 		routePlaceRepository.saveAll(copiedPlaces);
@@ -111,7 +111,7 @@ public class CommunityRouteService {
 	}
 
 	private PublicRouteResponse toPublicResponse(TravelRoute route) {
-		List<RoutePlace> routePlaces = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(route.getId());
+		List<RoutePlace> routePlaces = routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(route.getId());
 		Map<String, Long> saveCounts = popularityRepository.findSaveCountsByContentIds(
 				routePlaces.stream().map(RoutePlace::getContentId).distinct().toList()
 		);

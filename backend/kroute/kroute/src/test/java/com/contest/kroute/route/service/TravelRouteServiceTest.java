@@ -100,7 +100,7 @@ class TravelRouteServiceTest {
 				"Seoul day trip"
 		);
 		when(routeRepository.findByIdAndUserId(42L, 7L)).thenReturn(Optional.of(route));
-		when(routePlaceRepository.findAllByRouteIdOrderByVisitOrder(null)).thenReturn(List.of());
+		when(routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(null)).thenReturn(List.of());
 
 		RouteResponse response = routeService.changeVisibility(7L, 42L, new RouteVisibilityRequest(true));
 

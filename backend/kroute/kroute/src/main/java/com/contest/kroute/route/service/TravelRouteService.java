@@ -97,7 +97,7 @@ public class TravelRouteService {
 	}
 
 	private RouteResponse toResponse(TravelRoute route) {
-		List<RoutePlaceResponse> places = routePlaceRepository.findAllByRouteIdOrderByVisitOrder(route.getId()).stream()
+		List<RoutePlaceResponse> places = routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(route.getId()).stream()
 				.map(RoutePlaceResponse::from)
 				.toList();
 		return RouteResponse.from(route, places, routeRepository.countBySourceRouteId(route.getId()));

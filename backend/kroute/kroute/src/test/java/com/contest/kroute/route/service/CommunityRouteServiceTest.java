@@ -80,7 +80,7 @@ class CommunityRouteServiceTest {
 		when(communityRouteQueryRepository.findPublicRouteIds(criteria))
 				.thenReturn(new PublicRouteQueryResult(List.of(10L), 1));
 		when(routeRepository.findAllById(List.of(10L))).thenReturn(List.of(sourceRoute));
-		when(routePlaceRepository.findAllByRouteIdInOrderByRouteIdAscVisitOrderAsc(List.of(10L)))
+		when(routePlaceRepository.findAllByRouteIdsOrderByRouteAndVisitOrder(List.of(10L)))
 				.thenReturn(List.of(sourcePlace));
 		when(popularityRepository.findSaveCountsByContentIds(List.of("1001")))
 				.thenReturn(Map.of("1001", 4L));
@@ -121,7 +121,7 @@ class CommunityRouteServiceTest {
 		);
 
 		when(routeRepository.findByIdAndPublicRouteTrue(10L)).thenReturn(Optional.of(sourceRoute));
-		when(routePlaceRepository.findAllByRouteIdOrderByVisitOrder(null)).thenReturn(List.of(sourcePlace));
+		when(routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(null)).thenReturn(List.of(sourcePlace));
 		when(popularityRepository.findSaveCountsByContentIds(List.of("1001")))
 				.thenReturn(Map.of("1001", 3L));
 		when(routeRepository.countBySourceRouteId(null)).thenReturn(2L);
@@ -168,7 +168,7 @@ class CommunityRouteServiceTest {
 		when(routeRepository.findByIdAndPublicRouteTrue(10L)).thenReturn(Optional.of(sourceRoute));
 		when(userAccountRepository.getReferenceById(7L)).thenReturn(targetUser);
 		when(routeRepository.save(any(TravelRoute.class))).thenAnswer(invocation -> invocation.getArgument(0));
-		when(routePlaceRepository.findAllByRouteIdOrderByVisitOrder(null)).thenReturn(List.of(sourcePlace));
+		when(routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(null)).thenReturn(List.of(sourcePlace));
 		when(routePlaceRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
 		RouteResponse response = communityRouteService.copyPublicRoute(7L, 10L);
