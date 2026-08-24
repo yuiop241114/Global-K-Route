@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -31,11 +31,33 @@ export type PublicRoute = {
     RouteDraftPlace & { id: number; visitOrder: number; saveCount: number }
   >;
   copyCount: number;
+  viewCount: number;
+  placeSaveCount: number;
+  popularityScore: number;
   publishedAt: string;
   updatedAt: string;
 };
 
 export type PopularPlace = RouteDraftPlace & { saveCount: number };
+
+export type PopularityPeriod = "total" | "week" | "month";
+export type PopularPlaceCategory =
+  | "all"
+  | "tourist_attraction"
+  | "restaurant"
+  | "accommodation";
+
+export type PopularPlaceFilters = {
+  period: PopularityPeriod;
+  areaCode: number | null;
+  category: PopularPlaceCategory;
+};
+
+export const DEFAULT_POPULAR_PLACE_FILTERS: PopularPlaceFilters = {
+  period: "total",
+  areaCode: null,
+  category: "all",
+};
 
 export type PublicRouteSort = "latest" | "popular" | "placeCount";
 export type RoutePlaceCountFilter = "all" | "oneToThree" | "fourToSix" | "sevenPlus";
@@ -66,13 +88,19 @@ type CommunityBoardProps = {
   totalRoutes: number;
   hasNextPage: boolean;
   filters: PublicRouteFilters;
+  popularFilters: PopularPlaceFilters;
   error: string | null;
+  popularError: string | null;
+  isPopularLoading: boolean;
   onClose: () => void;
   onRefresh: () => void;
   onPreviewRoute: (route: PublicRoute) => void;
   onCopyRoute: (routeId: number) => void;
   onOpenPlace: (place: RouteDraftPlace) => void;
+  onViewRoute: (routeId: number) => void;
   onFiltersChange: (filters: PublicRouteFilters) => void;
+  onPopularFiltersChange: (filters: PopularPlaceFilters) => void;
+  onRefreshPopular: () => void;
   onLoadMore: () => void;
 };
 
@@ -106,6 +134,9 @@ const COPY_TEXT = {
     emptyPopular: "인기 장소를 계산할 저장 기록이 아직 없습니다.",
     places: "개 장소",
     copies: "회 복사",
+    views: "회 조회",
+    popularityScore: "인기 점수",
+    compositionSaves: "구성 장소 저장 합계",
     savedBy: "명이 저장",
     details: "상세 보기",
     preview: "지도 미리보기",
@@ -150,7 +181,17 @@ const COPY_TEXT = {
     stop: "번째 장소",
     addressUnavailable: "주소 정보 없음",
     published: "공개",
-    popularityNote: "장소를 저장하거나 코스에 넣은 고유 사용자 수입니다.",
+    period: "기간",
+    totalPeriod: "전체 누적",
+    weekPeriod: "최근 7일",
+    monthPeriod: "최근 30일",
+    category: "종류",
+    allCategories: "전체 종류",
+    spots: "관광지",
+    food: "음식점",
+    stays: "숙박",
+    clearPopularFilters: "인기 필터 초기화",
+    popularityNote: "장소를 직접 저장한 고유 사용자 수입니다. 저장을 취소하면 순위에 바로 반영됩니다.",
     loading: "불러오는 중...",
   },
   en: {
@@ -162,6 +203,9 @@ const COPY_TEXT = {
     emptyPopular: "There is not enough saved-place activity yet.",
     places: "places",
     copies: "copies",
+    views: "views",
+    popularityScore: "Popularity score",
+    compositionSaves: "Place saves in route",
     savedBy: "travelers saved",
     details: "View details",
     preview: "Preview on map",
@@ -206,7 +250,17 @@ const COPY_TEXT = {
     stop: "Stop",
     addressUnavailable: "Address unavailable",
     published: "Published",
-    popularityNote: "Counts unique users who saved a place or added it to a route.",
+    period: "Period",
+    totalPeriod: "All time",
+    weekPeriod: "Last 7 days",
+    monthPeriod: "Last 30 days",
+    category: "Category",
+    allCategories: "All categories",
+    spots: "Attractions",
+    food: "Restaurants",
+    stays: "Stays",
+    clearPopularFilters: "Clear popularity filters",
+    popularityNote: "Counts unique users who explicitly saved each place. Removing a save is reflected immediately.",
     loading: "Loading...",
   },
 } as const;
@@ -257,19 +311,26 @@ export default function CommunityBoard({
   totalRoutes,
   hasNextPage,
   filters,
+  popularFilters,
   error,
+  popularError,
+  isPopularLoading,
   onClose,
   onRefresh,
   onPreviewRoute,
   onCopyRoute,
   onOpenPlace,
+  onViewRoute,
   onFiltersChange,
+  onPopularFiltersChange,
+  onRefreshPopular,
   onLoadMore,
 }: CommunityBoardProps) {
   const [tab, setTab] = useState<"routes" | "popular">("routes");
   const [searchQuery, setSearchQuery] = useState(filters.query);
   const [detailRouteId, setDetailRouteId] = useState<number | null>(null);
   const [copiedShareRouteId, setCopiedShareRouteId] = useState<number | null>(null);
+  const viewedRouteIdsRef = useRef<Set<number>>(new Set());
   const copy = COPY_TEXT[language];
 
   useEffect(() => {
@@ -291,15 +352,23 @@ export default function CommunityBoard({
     const timer = window.setTimeout(() => {
       setTab("routes");
       setDetailRouteId(initialDetailRouteId);
+      if (!viewedRouteIdsRef.current.has(initialDetailRouteId)) {
+        viewedRouteIdsRef.current.add(initialDetailRouteId);
+        onViewRoute(initialDetailRouteId);
+      }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialDetailRouteId, routes]);
+  }, [initialDetailRouteId, onViewRoute, routes]);
 
   const hasActiveFilters =
     filters.query.length > 0 ||
     filters.areaCode !== null ||
     filters.placeCount !== "all" ||
     filters.sort !== "latest";
+  const hasActivePopularFilters =
+    popularFilters.period !== "total" ||
+    popularFilters.areaCode !== null ||
+    popularFilters.category !== "all";
 
   const detailRoute =
     detailRouteId === null
@@ -321,6 +390,13 @@ export default function CommunityBoard({
   function changeTab(nextTab: "routes" | "popular") {
     setTab(nextTab);
     setDetailRouteId(null);
+  }
+
+  function openRouteDetails(routeId: number) {
+    setDetailRouteId(routeId);
+    if (viewedRouteIdsRef.current.has(routeId)) return;
+    viewedRouteIdsRef.current.add(routeId);
+    onViewRoute(routeId);
   }
 
   function transportLabel(mode: PublicRoute["transportMode"]) {
@@ -363,7 +439,7 @@ export default function CommunityBoard({
             className="flex h-9 w-9 items-center justify-center border border-[#d0d5dd] text-[#475467] transition hover:text-[#2563eb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
             title={copy.refresh}
             type="button"
-            onClick={onRefresh}
+            onClick={tab === "popular" ? onRefreshPopular : onRefresh}
           >
             <RefreshCw aria-hidden="true" size={17} />
           </button>
@@ -403,11 +479,11 @@ export default function CommunityBoard({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        {isLoading && (tab !== "routes" || detailRoute) ? (
+        {isLoading && tab === "routes" && detailRoute ? (
           <div className="flex min-h-48 items-center justify-center text-sm text-[#667085]">{copy.loading}</div>
         ) : null}
 
-        {error ? (
+        {tab === "routes" && error ? (
           <p className="border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]" role="alert">{error}</p>
         ) : null}
 
@@ -498,20 +574,22 @@ export default function CommunityBoard({
                           <button
                             className="max-w-full text-left text-base font-semibold text-[#101828] hover:text-[#2563eb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
                             type="button"
-                            onClick={() => setDetailRouteId(route.id)}
+                            onClick={() => openRouteDetails(route.id)}
                           >
                             <span className="line-clamp-2">{route.title}</span>
                           </button>
                           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-[#667085]">
                             <span>{route.places.length} {copy.places}</span>
                             <span>{route.copyCount} {copy.copies}</span>
+                            <span>{route.viewCount} {copy.views}</span>
                             <span>{transportLabel(route.transportMode)}</span>
                           </div>
+                          <p className="mt-2 text-xs font-semibold text-[#2563eb]">{copy.popularityScore} {route.popularityScore.toFixed(1)}</p>
                           <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#667085]">{orderedPlaces.map((place) => place.title).join(" → ")}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-3 border-t border-[#e1e7ef]">
-                        <button className="flex h-11 items-center justify-center gap-1 px-2 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb] sm:gap-2 sm:text-sm" type="button" onClick={() => setDetailRouteId(route.id)}>
+                        <button className="flex h-11 items-center justify-center gap-1 px-2 text-xs font-semibold text-[#344054] transition hover:bg-[#f8fafc] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb] sm:gap-2 sm:text-sm" type="button" onClick={() => openRouteDetails(route.id)}>
                           <RouteIcon aria-hidden="true" size={16} />{copy.details}
                         </button>
                         <button className="flex h-11 items-center justify-center gap-1 border-l border-[#e1e7ef] px-2 text-xs font-semibold text-[#2563eb] transition hover:bg-[#eff6ff] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563eb] sm:gap-2 sm:text-sm" type="button" onClick={() => onPreviewRoute(route)}>
@@ -544,7 +622,11 @@ export default function CommunityBoard({
               <p className="text-xs font-semibold uppercase text-[#2563eb]">{copy.published} · {formatDate(detailRoute.publishedAt, language)}</p>
               <h3 className="mt-2 break-words text-2xl font-semibold text-[#101828]" id="community-route-detail-title">{detailRoute.title}</h3>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold text-[#667085]">
-                <span>{detailRoute.places.length} {copy.places}</span><span>{detailRoute.copyCount} {copy.copies}</span>
+                <span>{detailRoute.places.length} {copy.places}</span>
+                <span>{detailRoute.copyCount} {copy.copies}</span>
+                <span>{detailRoute.viewCount} {copy.views}</span>
+                <span>{copy.popularityScore} {detailRoute.popularityScore.toFixed(1)}</span>
+                <span>{copy.compositionSaves} {detailRoute.placeSaveCount}</span>
               </div>
             </div>
 
@@ -615,10 +697,59 @@ export default function CommunityBoard({
           </section>
         ) : null}
 
-        {!isLoading && !error && tab === "popular" ? (
+        {tab === "popular" ? (
           <section aria-label={copy.popular}>
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label>
+                <span className="sr-only">{copy.period}</span>
+                <select
+                  className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                  value={popularFilters.period}
+                  onChange={(event) => onPopularFiltersChange({ ...popularFilters, period: event.target.value as PopularityPeriod })}
+                >
+                  <option value="total">{copy.totalPeriod}</option>
+                  <option value="week">{copy.weekPeriod}</option>
+                  <option value="month">{copy.monthPeriod}</option>
+                </select>
+              </label>
+              <label>
+                <span className="sr-only">{copy.region}</span>
+                <select
+                  className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                  value={popularFilters.areaCode ?? ""}
+                  onChange={(event) => onPopularFiltersChange({ ...popularFilters, areaCode: event.target.value ? Number(event.target.value) : null })}
+                >
+                  <option value="">{copy.allRegions}</option>
+                  {ROUTE_AREAS.map((area) => <option key={area.code} value={area.code}>{area[language]}</option>)}
+                </select>
+              </label>
+              <label className="col-span-2 sm:col-span-1">
+                <span className="sr-only">{copy.category}</span>
+                <select
+                  className="h-11 w-full border border-[#d0d5dd] bg-white px-3 text-sm font-semibold text-[#344054] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#dbeafe]"
+                  value={popularFilters.category}
+                  onChange={(event) => onPopularFiltersChange({ ...popularFilters, category: event.target.value as PopularPlaceCategory })}
+                >
+                  <option value="all">{copy.allCategories}</option>
+                  <option value="tourist_attraction">{copy.spots}</option>
+                  <option value="restaurant">{copy.food}</option>
+                  <option value="accommodation">{copy.stays}</option>
+                </select>
+              </label>
+            </div>
+            {hasActivePopularFilters ? (
+              <div className="mb-3 flex justify-end border-b border-[#e1e7ef] pb-2">
+                <button className="flex min-h-9 items-center gap-1 text-xs font-semibold text-[#475467] hover:text-[#101828] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]" type="button" onClick={() => onPopularFiltersChange(DEFAULT_POPULAR_PLACE_FILTERS)}>
+                  <RotateCcw aria-hidden="true" size={15} />{copy.clearPopularFilters}
+                </button>
+              </div>
+            ) : null}
             <p className="mb-3 border-l-2 border-[#2563eb] pl-3 text-xs leading-5 text-[#667085]">{copy.popularityNote}</p>
-            {popularPlaces.length === 0 ? (
+            {popularError ? (
+              <p className="border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#b42318]" role="alert">{popularError}</p>
+            ) : isPopularLoading ? (
+              <div className="flex min-h-48 items-center justify-center text-sm text-[#667085]">{copy.loading}</div>
+            ) : popularPlaces.length === 0 ? (
               <div className="border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-8 text-center text-sm text-[#667085]">{copy.emptyPopular}</div>
             ) : (
               <ol className="space-y-2">

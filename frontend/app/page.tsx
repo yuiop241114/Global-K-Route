@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import AccountAccess, { type AccountUser } from "@/app/components/AccountAccess";
 import CommunityBoard, {
+  DEFAULT_POPULAR_PLACE_FILTERS,
   DEFAULT_PUBLIC_ROUTE_FILTERS,
   type PopularPlace,
+  type PopularPlaceFilters,
   type PublicRouteFilters,
   type PublicRoute,
 } from "@/app/components/CommunityBoard";
@@ -994,7 +996,20 @@ function isExternalUrl(value: string | null | undefined): value is string {
 }
 
 const ROUTE_DRAFT_STORAGE_KEY = "kroute.route-draft.v1";
+const PUBLIC_ROUTE_VISITOR_STORAGE_KEY = "kroute.public-route-visitor.v1";
 const MAX_ROUTE_PLACES = 30;
+
+function getPublicRouteVisitorId() {
+  try {
+    const stored = window.localStorage.getItem(PUBLIC_ROUTE_VISITOR_STORAGE_KEY);
+    if (stored) return stored;
+    const visitorId = window.crypto.randomUUID();
+    window.localStorage.setItem(PUBLIC_ROUTE_VISITOR_STORAGE_KEY, visitorId);
+    return visitorId;
+  } catch {
+    return window.crypto.randomUUID();
+  }
+}
 
 function isRouteDraftPlace(value: unknown): value is RouteDraftPlace {
   if (!value || typeof value !== "object") return false;
@@ -1066,6 +1081,11 @@ export default function Home() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [publicRoutes, setPublicRoutes] = useState<PublicRoute[]>([]);
   const [popularPlaces, setPopularPlaces] = useState<PopularPlace[]>([]);
+  const [popularFilters, setPopularFilters] = useState<PopularPlaceFilters>(() => ({
+    ...DEFAULT_POPULAR_PLACE_FILTERS,
+  }));
+  const [isPopularLoading, setIsPopularLoading] = useState(false);
+  const [popularError, setPopularError] = useState<string | null>(null);
   const [isCommunityOpen, setIsCommunityOpen] = useState(false);
   const [isCommunityLoading, setIsCommunityLoading] = useState(false);
   const [isCommunityLoadingMore, setIsCommunityLoadingMore] = useState(false);
@@ -1124,6 +1144,7 @@ export default function Home() {
   const savedPlacesRequestIdRef = useRef(0);
   const routesRequestIdRef = useRef(0);
   const communityRequestIdRef = useRef(0);
+  const popularRequestIdRef = useRef(0);
   const sharedRouteHandledRef = useRef(false);
 
   const apiBaseUrl = useMemo(() => {
@@ -1170,11 +1191,53 @@ export default function Home() {
     [popularPlaces],
   );
 
+  const loadPopularPlaces = useCallback(async (filters: PopularPlaceFilters) => {
+    const requestId = popularRequestIdRef.current + 1;
+    popularRequestIdRef.current = requestId;
+    setIsPopularLoading(true);
+    setPopularError(null);
+
+    try {
+      const params = new URLSearchParams({
+        period: filters.period,
+        limit: "12",
+      });
+      if (filters.areaCode !== null) params.set("areaCode", filters.areaCode.toString());
+      if (filters.category !== "all") params.set("category", filters.category);
+
+      const response = await backendApi<PopularPlace[]>(
+        `/public/places/popular?${params.toString()}`,
+      );
+      if (popularRequestIdRef.current !== requestId) return;
+      setPopularPlaces(response.data);
+    } catch (error) {
+      if (popularRequestIdRef.current !== requestId) return;
+      setPopularError(
+        error instanceof Error ? error.message : "Popular places could not be loaded",
+      );
+    } finally {
+      if (popularRequestIdRef.current === requestId) setIsPopularLoading(false);
+    }
+  }, []);
+
+  const trackPublicRouteView = useCallback(async (routeId: number) => {
+    try {
+      const response = await backendApi<PublicRoute>(`/public/routes/${routeId}/views`, {
+        method: "POST",
+        body: JSON.stringify({ visitorId: getPublicRouteVisitorId() }),
+      });
+      setPublicRoutes((previous) =>
+        previous.map((route) => route.id === routeId ? response.data : route),
+      );
+    } catch {
+      // Analytics must never block route browsing.
+    }
+  }, []);
+
   const loadCommunity = useCallback(async (
     filters: PublicRouteFilters,
     page = 0,
     append = false,
-    refreshPopular = false,
   ) => {
     const requestId = communityRequestIdRef.current + 1;
     communityRequestIdRef.current = requestId;
@@ -1199,12 +1262,9 @@ export default function Home() {
         params.set("minPlaces", "7");
       }
 
-      const [routeResponse, popularResponse] = await Promise.all([
-        backendApi<PageData<PublicRoute>>(`/public/routes/search?${params.toString()}`),
-        refreshPopular
-          ? backendApi<PopularPlace[]>("/public/places/popular?limit=12")
-          : Promise.resolve(null),
-      ]);
+      const routeResponse = await backendApi<PageData<PublicRoute>>(
+        `/public/routes/search?${params.toString()}`,
+      );
       if (communityRequestIdRef.current !== requestId) return;
       setPublicRoutes((previous) => {
         if (!append) return routeResponse.data.content;
@@ -1217,7 +1277,6 @@ export default function Home() {
       setCommunityPage(routeResponse.data.page);
       setCommunityTotalRoutes(routeResponse.data.totalElements);
       setCommunityHasNextPage(routeResponse.data.hasNext);
-      if (popularResponse) setPopularPlaces(popularResponse.data);
     } catch (error) {
       if (communityRequestIdRef.current !== requestId) return;
       setCommunityError(
@@ -1238,12 +1297,17 @@ export default function Home() {
     setPreviewPublicRouteId(null);
     setSharedCommunityRouteId(null);
     setCommunityPreviewPlaces(null);
-    void loadCommunity(nextFilters, 0, false, false);
+    void loadCommunity(nextFilters, 0, false);
   }, [loadCommunity]);
+
+  const changePopularFilters = useCallback((nextFilters: PopularPlaceFilters) => {
+    setPopularFilters(nextFilters);
+    void loadPopularPlaces(nextFilters);
+  }, [loadPopularPlaces]);
 
   const loadMoreCommunityRoutes = useCallback(() => {
     if (isCommunityLoadingMore || !communityHasNextPage) return;
-    void loadCommunity(communityFilters, communityPage + 1, true, false);
+    void loadCommunity(communityFilters, communityPage + 1, true);
   }, [
     communityFilters,
     communityHasNextPage,
@@ -1268,13 +1332,10 @@ export default function Home() {
       setPreviewPublicRouteId(routeId);
       setSharedCommunityRouteId(routeId);
 
-      Promise.all([
-        backendApi<PublicRoute>(`/public/routes/${routeId}`),
-        backendApi<PopularPlace[]>("/public/places/popular?limit=12"),
-      ])
-        .then(([routeResponse, popularResponse]) => {
+      void loadPopularPlaces(DEFAULT_POPULAR_PLACE_FILTERS);
+      backendApi<PublicRoute>(`/public/routes/${routeId}`)
+        .then((routeResponse) => {
           setPublicRoutes([routeResponse.data]);
-          setPopularPlaces(popularResponse.data);
           setCommunityPage(0);
           setCommunityTotalRoutes(1);
           setCommunityHasNextPage(false);
@@ -1291,7 +1352,7 @@ export default function Home() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadPopularPlaces]);
 
   const handleSessionChange = useCallback((user: AccountUser | null) => {
     setCurrentUser(user);
@@ -1781,7 +1842,7 @@ export default function Home() {
       );
       setRoutes((previous) => [response.data, ...previous]);
       openRoute(response.data);
-      void loadCommunity(communityFilters, 0, false, true);
+      void loadCommunity(communityFilters, 0, false);
     } catch (error) {
       setCommunityError(
         error instanceof Error ? error.message : messages.routeCopyError,
@@ -1809,7 +1870,7 @@ export default function Home() {
           item.id === response.data.id ? response.data : item,
         ),
       );
-      void loadCommunity(communityFilters, 0, false, true);
+      void loadCommunity(communityFilters, 0, false);
     } catch (error) {
       setRouteError(
         error instanceof Error ? error.message : messages.routeSaveError,
@@ -1878,6 +1939,7 @@ export default function Home() {
         setSavedPlaces((previous) =>
           previous.filter((savedPlace) => savedPlace.id !== existing.id),
         );
+        void loadPopularPlaces(popularFilters);
         return;
       }
 
@@ -1902,6 +1964,7 @@ export default function Home() {
           (savedPlace) => savedPlace.contentId !== response.data.contentId,
         ),
       ]);
+      void loadPopularPlaces(popularFilters);
     } catch (error) {
       setSavedPlacesError(
         error instanceof Error ? error.message : messages.savedLoadError,
@@ -2747,7 +2810,8 @@ export default function Home() {
                   setIsSavedPlacesOpen(false);
                   setIsRoutePlannerOpen(false);
                   setIsCommunityOpen(true);
-                  void loadCommunity(communityFilters, 0, false, true);
+                  void loadCommunity(communityFilters, 0, false);
+                  void loadPopularPlaces(popularFilters);
                 }}
               >
                 <Users aria-hidden="true" size={17} />
@@ -2805,7 +2869,10 @@ export default function Home() {
               isAuthenticated={currentUser !== null}
               isLoading={isCommunityLoading}
               isLoadingMore={isCommunityLoadingMore}
+              isPopularLoading={isPopularLoading}
               language={uiLanguage}
+              popularError={popularError}
+              popularFilters={popularFilters}
               popularPlaces={popularPlaces}
               routes={publicRoutes}
               selectedRouteId={previewPublicRouteId}
@@ -2816,8 +2883,11 @@ export default function Home() {
               onFiltersChange={changeCommunityFilters}
               onLoadMore={loadMoreCommunityRoutes}
               onOpenPlace={openCommunityPlace}
+              onPopularFiltersChange={changePopularFilters}
               onPreviewRoute={previewPublicRoute}
-              onRefresh={() => void loadCommunity(communityFilters, 0, false, true)}
+              onRefresh={() => void loadCommunity(communityFilters, 0, false)}
+              onRefreshPopular={() => void loadPopularPlaces(popularFilters)}
+              onViewRoute={(routeId) => void trackPublicRouteView(routeId)}
             />
           ) : null}
 

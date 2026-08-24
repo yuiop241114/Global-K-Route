@@ -1,5 +1,6 @@
 package com.contest.kroute.route.controller;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.context.annotation.Profile;
@@ -8,16 +9,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.contest.kroute.auth.security.UserPrincipal;
 import com.contest.kroute.common.ApiResponse;
 import com.contest.kroute.common.PageResponse;
+import com.contest.kroute.route.dto.PopularPlaceSearchCriteria;
 import com.contest.kroute.route.dto.PopularPlaceResponse;
 import com.contest.kroute.route.dto.PublicRouteSearchCriteria;
 import com.contest.kroute.route.dto.PublicRouteResponse;
 import com.contest.kroute.route.dto.RouteResponse;
+import com.contest.kroute.route.dto.RouteViewRequest;
+
+import jakarta.validation.Valid;
 import com.contest.kroute.route.service.CommunityRouteService;
 
 @RestController
@@ -64,6 +70,16 @@ public class CommunityRouteController {
 		return ApiResponse.ok(communityRouteService.findPublicRoute(routeId));
 	}
 
+	@PostMapping("/routes/{routeId}/views")
+	public ApiResponse<PublicRouteResponse> recordPublicRouteView(
+			@PathVariable Long routeId,
+			@Valid @RequestBody RouteViewRequest request) {
+		return ApiResponse.ok(
+				communityRouteService.recordPublicRouteView(routeId, request.visitorId()),
+				"Route view recorded"
+		);
+	}
+
 	@PostMapping("/routes/{routeId}/copy")
 	public ApiResponse<RouteResponse> copyPublicRoute(@AuthenticationPrincipal UserPrincipal user,
 			@PathVariable Long routeId) {
@@ -72,7 +88,17 @@ public class CommunityRouteController {
 
 	@GetMapping("/places/popular")
 	public ApiResponse<List<PopularPlaceResponse>> findPopularPlaces(
+			@RequestParam(defaultValue = "total") String period,
+			@RequestParam(required = false) Integer areaCode,
+			@RequestParam(required = false) String category,
 			@RequestParam(defaultValue = "10") int limit) {
-		return ApiResponse.ok(communityRouteService.findPopularPlaces(limit));
+		PopularPlaceSearchCriteria criteria = PopularPlaceSearchCriteria.of(
+				period,
+				areaCode,
+				category,
+				limit,
+				Instant.now()
+		);
+		return ApiResponse.ok(communityRouteService.findPopularPlaces(criteria));
 	}
 }

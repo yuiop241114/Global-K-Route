@@ -11,6 +11,6 @@ public interface TravelRouteRepository extends JpaRepository<TravelRoute, Long> 
 	List<TravelRoute> findAllByUserIdOrderByUpdatedAtDesc(Long userId);
 	Optional<TravelRoute> findByIdAndUserId(Long id, Long userId);
 	Optional<TravelRoute> findByIdAndPublicRouteTrue(Long id);
-	long countBySourceRouteId(Long sourceRouteId);
+	long countBySourceRouteIdAndUserIdNot(Long sourceRouteId, Long userId);
 	long deleteByIdAndUserId(Long id, Long userId);
 }

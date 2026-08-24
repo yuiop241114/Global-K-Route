@@ -76,7 +76,7 @@ public class TravelRouteService {
 		return RouteResponse.from(
 				route,
 				places.stream().map(RoutePlaceResponse::from).toList(),
-				routeRepository.countBySourceRouteId(route.getId())
+				routeRepository.countBySourceRouteIdAndUserIdNot(route.getId(), route.getOwnerId())
 		);
 	}
 
@@ -100,7 +100,11 @@ public class TravelRouteService {
 		List<RoutePlaceResponse> places = routePlaceRepository.findAllByRoute_IdOrderByVisitOrder(route.getId()).stream()
 				.map(RoutePlaceResponse::from)
 				.toList();
-		return RouteResponse.from(route, places, routeRepository.countBySourceRouteId(route.getId()));
+		return RouteResponse.from(
+				route,
+				places,
+				routeRepository.countBySourceRouteIdAndUserIdNot(route.getId(), route.getOwnerId())
+		);
 	}
 
 	private List<RoutePlace> savePlaces(TravelRoute route, List<RoutePlaceRequest> requests) {

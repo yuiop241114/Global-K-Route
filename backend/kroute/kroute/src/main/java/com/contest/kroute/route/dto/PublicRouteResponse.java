@@ -14,10 +14,14 @@ public record PublicRouteResponse(
 		RouteTransportMode transportMode,
 		List<PublicRoutePlaceResponse> places,
 		long copyCount,
+		long viewCount,
+		long placeSaveCount,
+		double popularityScore,
 		Instant publishedAt,
 		Instant updatedAt
 ) {
-	public static PublicRouteResponse from(TravelRoute route, List<PublicRoutePlaceResponse> places, long copyCount) {
+	public static PublicRouteResponse from(TravelRoute route, List<PublicRoutePlaceResponse> places,
+			RoutePopularityMetrics metrics, long placeSaveCount, double popularityScore) {
 		return new PublicRouteResponse(
 				route.getId(),
 				route.getTitle(),
@@ -25,7 +29,10 @@ public record PublicRouteResponse(
 				route.getTravelDate(),
 				route.getTransportMode(),
 				places,
-				copyCount,
+				metrics.copyCount(),
+				metrics.viewCount(),
+				placeSaveCount,
+				popularityScore,
 				route.getPublishedAt(),
 				route.getUpdatedAt()
 		);

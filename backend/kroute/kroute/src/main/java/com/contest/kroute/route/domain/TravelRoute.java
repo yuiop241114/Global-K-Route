@@ -110,6 +110,10 @@ public class TravelRoute {
 		return id;
 	}
 
+	public Long getOwnerId() {
+		return user.getId();
+	}
+
 	public String getTitle() {
 		return title;
 	}

@@ -1,5 +1,7 @@
 package com.contest.kroute.route.dto;
 
+import java.time.Instant;
+
 public record PublicRouteSearchCriteria(
 		String query,
 		Integer areaCode,
@@ -7,7 +9,8 @@ public record PublicRouteSearchCriteria(
 		Integer maxPlaces,
 		PublicRouteSort sort,
 		int page,
-		int size
+		int size,
+		Instant scoredAt
 ) {
 	private static final int MAX_QUERY_LENGTH = 100;
 	private static final int MAX_ROUTE_PLACES = 30;
@@ -15,6 +18,11 @@ public record PublicRouteSearchCriteria(
 
 	public static PublicRouteSearchCriteria of(String query, Integer areaCode, Integer minPlaces,
 			Integer maxPlaces, String sort, int page, int size) {
+		return of(query, areaCode, minPlaces, maxPlaces, sort, page, size, Instant.now());
+	}
+
+	public static PublicRouteSearchCriteria of(String query, Integer areaCode, Integer minPlaces,
+			Integer maxPlaces, String sort, int page, int size, Instant scoredAt) {
 		String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
 		if (normalizedQuery != null && normalizedQuery.length() > MAX_QUERY_LENGTH) {
 			throw new IllegalArgumentException("Route search query must be 100 characters or fewer");
@@ -40,7 +48,8 @@ public record PublicRouteSearchCriteria(
 				maxPlaces,
 				PublicRouteSort.from(sort),
 				page,
-				size
+				size,
+				scoredAt
 		);
 	}
 

@@ -46,6 +46,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, "/api/places/**", "/api/public/**",
 								"/api/auth/csrf", "/api/auth/me").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/public/routes/walking-path").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/public/routes/*/views").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login",
 								"/api/auth/username/reminder", "/api/auth/password/forgot",
 								"/api/auth/password/reset").permitAll()
